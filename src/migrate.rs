@@ -918,7 +918,7 @@ fn update_transaction_positions(
 }
 
 /// Use placeholder positions when we can't get real position information
-fn use_placeholder_positions(
+pub fn use_placeholder_positions(
     transactions: &mut HashMap<TxId, zewif::Transaction>,
 ) -> Result<()> {
     eprintln!("Using placeholder positions for outputs (not ideal for production)");

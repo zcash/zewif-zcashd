@@ -30,3 +30,9 @@ mod_use!(utils);
 mod_use!(zcashd_dump);
 mod_use!(zcashd_parser);
 mod_use!(zcashd_wallet);
+
+// Re-export the types that are part of the public API
+pub use crate::zcashd_wallet::ZcashdWallet;
+pub use crate::zcashd_parser::ZcashdParser;
+
+// No test utils needed for now
