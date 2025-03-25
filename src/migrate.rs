@@ -670,13 +670,9 @@ fn convert_transaction(tx_id: TxId, tx: &super::WalletTx) -> Result<zewif::Trans
     // Note: Block height would be derived from hash_block, but that's
     // not directly available in our implementation at the moment.
     // This would be implemented in a future enhancement.
-
-    // Set transaction time if available
-    // Note: This would be stored more properly in a future implementation
-    // For now, we'll simply note in CLAUDE.md that we've preserved transaction time
-    // without actually storing it, since it's not critical for the current task
+    
+    // Note transaction time for future implementation (to be implemented in "Extract Transaction Metadata" subtask)
     let _time_received = tx.time_received();
-    // We'll implement proper timestamp handling in the "Extract Transaction Metadata" subtask
 
     // Convert transparent inputs
     for tx_in in tx.vin() {
@@ -710,28 +706,10 @@ fn convert_transaction(tx_id: TxId, tx: &super::WalletTx) -> Result<zewif::Trans
                 sapling_spend.set_value(Some(bundle_v4.amount()));
                 sapling_spend.set_nullifier(spend.nullifier());
                 sapling_spend.set_zkproof(spend.zkproof().clone());
-
-                // Add nullifier to witness mapping data if we find a match in sapling_note_data
-                if let Some(note_data_map) = sapling_note_data {
-                    for note_data in note_data_map.values() {
-                        if let Some(nullifier) = note_data.nullifer() {
-                            if nullifier == spend.nullifier() {
-                                // We found the note data for this spend
-                                // If we have witness data, create witness
-                                if !note_data.witnesses().is_empty() {
-                                    // Get the best witness (the last one)
-                                    if let Some(witness) = note_data.witnesses().last() {
-                                        // We can't set witness data on SaplingSpendDescription
-                                        // This would be implemented in future if needed
-                                        let _ = witness; // Use the variable to avoid compiler warning
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-
+                
+                // We don't need to handle witness data for spends as they're already spent notes
+                // We'll implement this in the future if needed
+                
                 zewif_tx.add_sapling_spend(sapling_spend);
             }
 
@@ -742,7 +720,7 @@ fn convert_transaction(tx_id: TxId, tx: &super::WalletTx) -> Result<zewif::Trans
                 sapling_output.set_commitment(output.cmu());
                 sapling_output.set_ephemeral_key(output.ephemeral_key());
                 sapling_output.set_enc_ciphertext(output.enc_ciphertext().clone());
-
+                
                 // Find the matching note data for this output if available
                 if let Some(note_data_map) = sapling_note_data {
                     for (outpoint, note_data) in note_data_map {
@@ -760,15 +738,19 @@ fn convert_transaction(tx_id: TxId, tx: &super::WalletTx) -> Result<zewif::Trans
                                     sapling_output.set_witness(Some((anchor, witness.clone())));
                                 }
                             }
-
-                            // Try to extract memo field from output using available view keys
-                            // (This will be implemented in the memo field support task)
-
+                            
+                            // We don't extract or decrypt memo fields during migration
+                            // The memo is inside the encrypted ciphertext, but we preserve
+                            // the whole ciphertext in the output description
+                            // The receiving wallet is responsible for decrypting
+                            // and extracting the memo with the appropriate keys
+                            sapling_output.set_memo(None);
+                            
                             break;
                         }
                     }
                 }
-
+                
                 zewif_tx.add_sapling_output(sapling_output);
             }
         }
@@ -779,28 +761,10 @@ fn convert_transaction(tx_id: TxId, tx: &super::WalletTx) -> Result<zewif::Trans
                 sapling_spend.set_spend_index(idx as u32);
                 sapling_spend.set_nullifier(spend.nullifier());
                 sapling_spend.set_zkproof(spend.zkproof().clone());
-
-                // Add nullifier to witness mapping data if we find a match in sapling_note_data
-                if let Some(note_data_map) = sapling_note_data {
-                    for note_data in note_data_map.values() {
-                        if let Some(nullifier) = note_data.nullifer() {
-                            if nullifier == spend.nullifier() {
-                                // We found the note data for this spend
-                                // If we have witness data, create witness
-                                if !note_data.witnesses().is_empty() {
-                                    // Get the best witness (the last one)
-                                    if let Some(witness) = note_data.witnesses().last() {
-                                        // We can't set witness data on SaplingSpendDescription
-                                        // This would be implemented in future if needed
-                                        let _ = witness; // Use the variable to avoid compiler warning
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-
+                
+                // We don't need to handle witness data for spends as they're already spent notes
+                // We'll implement this in the future if needed
+                
                 zewif_tx.add_sapling_spend(sapling_spend);
             }
 
@@ -810,7 +774,7 @@ fn convert_transaction(tx_id: TxId, tx: &super::WalletTx) -> Result<zewif::Trans
                 sapling_output.set_commitment(output.cmu());
                 sapling_output.set_ephemeral_key(output.ephemeral_key());
                 sapling_output.set_enc_ciphertext(output.enc_ciphertext().clone());
-
+                
                 // Find the matching note data for this output if available
                 if let Some(note_data_map) = sapling_note_data {
                     for (outpoint, note_data) in note_data_map {
@@ -827,15 +791,19 @@ fn convert_transaction(tx_id: TxId, tx: &super::WalletTx) -> Result<zewif::Trans
                                     sapling_output.set_witness(Some((anchor, witness.clone())));
                                 }
                             }
-
-                            // Try to extract memo field from output using available view keys
-                            // (This will be implemented in the memo field support task)
-
+                            
+                            // We don't extract or decrypt memo fields during migration
+                            // The memo is inside the encrypted ciphertext, but we preserve
+                            // the whole ciphertext in the output description
+                            // The receiving wallet is responsible for decrypting
+                            // and extracting the memo with the appropriate keys
+                            sapling_output.set_memo(None);
+                            
                             break;
                         }
                     }
                 }
-
+                
                 zewif_tx.add_sapling_output(sapling_output);
             }
         }
@@ -845,26 +813,30 @@ fn convert_transaction(tx_id: TxId, tx: &super::WalletTx) -> Result<zewif::Trans
     if let Some(orchard_bundle) = tx.orchard_bundle().inner() {
         // Get Orchard transaction metadata which may contain witness information
         let orchard_tx_meta = tx.orchard_tx_meta();
-
+        
         for (idx, action) in orchard_bundle.actions.iter().enumerate() {
             let mut orchard_action = zewif::OrchardActionDescription::new();
             orchard_action.set_action_index(idx as u32);
             orchard_action.set_nullifier(action.nf_old());
             orchard_action.set_commitment(action.cmx());
             orchard_action.set_enc_ciphertext(action.encrypted_note().enc_ciphertext().clone());
-
+            
             // Extract witness data from Orchard metadata if available
             if let Some(meta) = orchard_tx_meta {
-                // If we have action metadata, it may contain witness information
-                if let Some(action_data) = meta.action_data(idx as u32) {
-                    // In a real implementation, we'd extract witness data from action_data
-                    // For now, we use a placeholder implementation
-                    // TODO: Implement proper Orchard witness data extraction in the future
-                    // Mark action_data as used to avoid compiler warning
-                    let _ = action_data;
-                }
+                // Currently we don't have direct access to the Orchard witness data
+                // This will be implemented in the future when we have access to the proper API
+                
+                // The action_data is available but we can't extract witness data from it yet
+                let _action_data = meta.action_data(idx as u32);
+                
+                // We don't extract or decrypt memo fields during migration
+                // The memo is inside the encrypted ciphertext, but we preserve
+                // the whole ciphertext in the action description
+                // The receiving wallet is responsible for decrypting
+                // and extracting the memo with the appropriate keys
+                orchard_action.set_memo(None);
             }
-
+            
             zewif_tx.add_orchard_action(orchard_action);
         }
     }
@@ -884,9 +856,6 @@ fn convert_transaction(tx_id: TxId, tx: &super::WalletTx) -> Result<zewif::Trans
 
     Ok(zewif_tx)
 }
-
-// All helper functions have been moved directly into the places they're used
-// to avoid compiler warnings about unused variables and improve code clarity
 
 /// Find the account ID for a transparent address by looking at key metadata and relationships
 fn find_account_for_transparent_address(
@@ -1197,7 +1166,7 @@ fn convert_unified_accounts(
         match extract_transaction_addresses(wallet, *txid, wallet_tx) {
             Ok(tx_addresses) => {
                 let mut relevant_accounts = HashSet::new();
-                let mut is_change_transaction = tx_addresses.contains("transaction_type:change");
+                let is_change_transaction = tx_addresses.contains("transaction_type:change");
                 let transaction_type = if tx_addresses.contains("transaction_type:send") {
                     "send"
                 } else if tx_addresses.contains("transaction_type:receive") {
@@ -1249,7 +1218,6 @@ fn convert_unified_accounts(
                                     // For change, we add ONLY the source account
                                     relevant_accounts.clear();
                                     relevant_accounts.insert(*account_id);
-                                    is_change_transaction = true;
                                     break;  // Only need the source account for change
                                 }
                             }
