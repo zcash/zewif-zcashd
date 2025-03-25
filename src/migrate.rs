@@ -666,13 +666,31 @@ fn convert_transaction(tx_id: TxId, tx: &super::WalletTx) -> Result<zewif::Trans
         zewif_tx.set_raw(tx.unparsed_data().clone());
     }
 
-    // Add basic transaction metadata
-    // Note: Block height would be derived from hash_block, but that's
-    // not directly available in our implementation at the moment.
-    // This would be implemented in a future enhancement.
+    // Add transaction metadata
     
-    // Note transaction time for future implementation (to be implemented in "Extract Transaction Metadata" subtask)
-    let _time_received = tx.time_received();
+    // Extract block hash if available
+    let hash_block = tx.hash_block();
+    if hash_block != u256::default() {
+        // If the hash_block is not zero, the transaction is confirmed
+        zewif_tx.set_block_hash(hash_block);
+        
+        // Set transaction status to confirmed
+        zewif_tx.set_status(zewif::TransactionStatus::Confirmed);
+        
+        // Note: Block height would normally be derived by looking up the hash in a chain index
+        // We don't have that capability here, but we could in future add a translation table
+        // TODO: Add block height lookup when chain access is available
+    } else {
+        // Transaction is not confirmed
+        zewif_tx.set_status(zewif::TransactionStatus::Pending);
+    }
+    
+    // Extract timestamp
+    let tx_time = tx.time_received();
+    if tx_time > 0 {
+        let timestamp = zewif::SecondsSinceEpoch::from(tx_time as u64);
+        zewif_tx.set_timestamp(timestamp);
+    }
 
     // Convert transparent inputs
     for tx_in in tx.vin() {
