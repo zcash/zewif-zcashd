@@ -1,6 +1,6 @@
 use zewif::mod_use;
 
-mod migrate;
+pub mod migrate;
 
 mod_use!(address);
 mod_use!(bdb_dump);
