@@ -1,15 +1,26 @@
 use anyhow::Result;
 
-use zewif::{Blob32, SecondsSinceEpoch};
+use zewif::{Blob32, NoQuotesDebugOption, SecondsSinceEpoch};
 use zewif::{parse, parser::prelude::*};
 
 const VERSION_WITH_HDDATA: i32 = 10;
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct KeyMetadata {
     version: i32,
     create_time: Option<SecondsSinceEpoch>,
     hd_keypath: Option<String>,
     seed_fp: Option<Blob32>,
+}
+
+impl std::fmt::Debug for KeyMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KeyMetadata")
+            .field("version", &self.version)
+            .field("create_time", &NoQuotesDebugOption(&self.create_time))
+            .field("hd_keypath", &NoQuotesDebugOption(&self.hd_keypath))
+            .field("seed_fp", &NoQuotesDebugOption(&self.seed_fp))
+            .finish()
+    }
 }
 
 impl KeyMetadata {

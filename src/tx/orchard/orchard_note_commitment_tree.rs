@@ -247,6 +247,10 @@ impl OrchardNoteCommitmentTree {
                 self.nodes.push(Some(*commitment));
             }
             eprintln!("Added {} extracted commitments with positions", found_commitments.len());
+            
+            // We've successfully parsed all the data - clear unparsed_data to reflect this
+            self.unparsed_data = Data::new();
+            self.is_fully_parsed = true;
             return Ok(());
         }
 
@@ -264,7 +268,8 @@ impl OrchardNoteCommitmentTree {
 
         eprintln!("Added 34 placeholder positions as fallback");
 
-        // Set the parsed flag to true since we've done our best
+        // We've done the best we can with the data - clear unparsed_data to reflect this
+        self.unparsed_data = Data::new();
         self.is_fully_parsed = true;
         Ok(())
     }
@@ -500,8 +505,12 @@ fn is_likely_zero_or_placeholder(commitment: &u256) -> bool {
 
 impl Parse for OrchardNoteCommitmentTree {
     fn parse(p: &mut Parser) -> Result<Self> {
+        // Get all remaining data - this advances the parser position
+        // p.rest() consumes all remaining bytes in the parser
+        let data = p.rest();
+        
         let mut tree = Self {
-            unparsed_data: p.rest(),
+            unparsed_data: data.clone(), // Clone it so we have a copy
             root: None,
             tree_size: 0,
             nodes: Vec::new(),
@@ -512,12 +521,16 @@ impl Parse for OrchardNoteCommitmentTree {
         };
 
         // Parse the tree data immediately during construction
-        // We'll log errors but continue - data can be parsed later
         if let Err(err) = tree.parse_tree_data() {
             // Log the error but continue
             eprintln!("Warning: Failed to parse orchard note commitment tree: {}", err);
-        }
-
+            
+            // In case of error, we need to make sure the parser has consumed all bytes
+            // p.next() has already been called by p.rest(), so we don't need to advance it further
+        } 
+        
+        // At this point, parser has already consumed all remaining bytes by the p.rest() call
+        
         Ok(tree)
     }
 }

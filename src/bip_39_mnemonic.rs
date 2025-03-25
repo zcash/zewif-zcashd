@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use zewif::{parse, u256, MnemonicLanguage};
+use zewif::{parse, u256, MnemonicLanguage, NoQuotesDebugOption};
 use zewif::parser::prelude::*;
 
 pub struct Bip39Mnemonic {
@@ -12,9 +12,9 @@ pub struct Bip39Mnemonic {
 impl std::fmt::Debug for Bip39Mnemonic {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_struct("MnemonicSeed")
-            .field("language", &self.language)
+            .field("language", &NoQuotesDebugOption(&self.language))
             .field("mnemonic", &self.mnemonic)
-            .field("fingerprint", &&self.fingerprint)
+            .field("fingerprint", &NoQuotesDebugOption(&self.fingerprint))
             .finish()
     }
 }
