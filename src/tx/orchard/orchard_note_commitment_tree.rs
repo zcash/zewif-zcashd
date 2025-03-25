@@ -270,6 +270,13 @@ impl OrchardNoteCommitmentTree {
     }
 
     /// Recursively build the tree structure from the flat nodes array
+    ///
+    /// Not currently used because the migration process only needs the commitment-to-position mapping,
+    /// not the full tree structure. This function would be useful for:
+    /// 1. Visualization of the complete tree structure for debugging
+    /// 2. More advanced tree operations that require parent-child relationships
+    /// 3. Future enhancements that might need hierarchical tree traversal
+    #[allow(dead_code)]
     fn build_tree_node(&self, index: usize) -> Option<NoteCommitmentTreeNode> {
         if index >= self.nodes.len() {
             return None;
@@ -312,6 +319,13 @@ impl OrchardNoteCommitmentTree {
     }
 
     /// Build a mapping from commitment hashes to their positions in the tree
+    ///
+    /// Not currently used because we directly build this mapping during the parse_tree_data()
+    /// function, which uses a more direct extraction approach. This function would be useful for:
+    /// 1. Rebuilding the mapping after tree modifications
+    /// 2. Creating the mapping from a fully constructed tree structure
+    /// 3. Adding support for different tree traversal algorithms in the future
+    #[allow(dead_code)]
     fn build_commitment_position_map(&mut self) {
         // Clear existing data
         self.commitment_positions.clear();
@@ -446,6 +460,14 @@ impl OrchardNoteCommitmentTree {
 /// - Depth 1 nodes are at indices 1-2
 /// - Depth 2 nodes are at indices 3-6
 /// - Depth d nodes start at index 2^d - 1
+///
+/// Not currently used directly in the migration process since we don't build
+/// the full tree structure, but it's a core component of the tree-building logic.
+/// Would be useful for:
+/// 1. Full tree traversal and analysis
+/// 2. Advanced tree operations that require understanding node depth
+/// 3. Implementing alternative tree serialization formats
+#[allow(dead_code)]
 fn calculate_depth_from_index(index: usize) -> usize {
     (index + 1).next_power_of_two().trailing_zeros() as usize
 }
