@@ -879,93 +879,133 @@ fn update_transaction_positions(
     wallet: &ZcashdWallet,
     transactions: &mut HashMap<TxId, zewif::Transaction>,
 ) -> Result<()> {
+    // Get the orchard note commitment tree from the wallet
+    let note_commitment_tree = wallet.orchard_note_commitment_tree();
+    
     // Check if we have a valid tree to process
-    if wallet
-        .orchard_note_commitment_tree()
-        .unparsed_data()
-        .is_empty()
-    {
+    if note_commitment_tree.unparsed_data().is_empty() {
+        // No tree data available
+        eprintln!("No orchard note commitment tree data found in wallet");
         return Ok(());
     }
 
-    // We'll use the note metadata to link commitments to positions
-    // Map from commitment to position
-    let mut commitment_positions: HashMap<u256, Position> = HashMap::new();
+    // Parse the tree data if not already parsed
+    if !note_commitment_tree.is_fully_parsed() {
+        // Get a mutable copy we can parse - this is not optimal but allows us to work with the current API
+        let mut tree_clone = note_commitment_tree.clone();
+        if let Err(err) = tree_clone.parse_tree_data() {
+            eprintln!("Failed to parse orchard note commitment tree: {}", err);
+            // Continue with placeholder values if we can't parse the tree
+            return use_placeholder_positions(transactions);
+        }
+        
+        // Get the commitment positions from the parsed tree
+        // Log summary information to help with debugging
+        eprintln!("{}", tree_clone.get_tree_summary());
+        
+        // Get the map of commitment hashes to tree positions
+        let commitment_positions = tree_clone.commitment_positions().clone();
+        
+        // Update transactions with real commitment positions from the tree
+        update_transactions_with_positions(transactions, &commitment_positions)?;
+    } else {
+        // Tree was already parsed - use its positions directly
+        let commitment_positions = note_commitment_tree.commitment_positions().clone();
+        update_transactions_with_positions(transactions, &commitment_positions)?;
+    }
 
-    // For each transaction with Orchard actions
-    for (tx_id, zewif_tx) in transactions.iter_mut() {
-        // Find the corresponding zcashd transaction to get metadata
-        if let Some(zcashd_tx) = wallet.transactions().get(tx_id) {
-            // Check for Orchard bundle
-            if let Some(_orchard_bundle) = zcashd_tx.orchard_bundle().inner() {
-                // Check for Orchard transaction metadata
-                if let Some(orchard_meta) = zcashd_tx.orchard_tx_meta() {
-                    // Process each Orchard action if we have any
-                    if let Some(orchard_actions) = zewif_tx.orchard_actions() {
-                        for (idx, action) in orchard_actions.iter().enumerate() {
-                            // Use idx as action_index because it's the only identifier we have for now
-                            if let Some(_action_data) = orchard_meta.action_data(idx as u32) {
-                                // Generate a placeholder position based on the action index
-                                // In a real implementation, we'd extract this from the tree structure
-                                let position = Position::from(idx + 1); // Placeholder, starting from 1
+    Ok(())
+}
 
-                                // Create a new action with the updated position
-                                let mut updated_action = action.clone();
-                                updated_action.set_note_commitment_tree_position(position);
-
-                                // Here, we would normally update the action in the vector,
-                                // but we can't because we only have an immutable reference through orchard_actions()
-                                // For a real implementation, we'd need a mutable access method
-
-                                // For now, we'll just record the position for later use
-                                commitment_positions.insert(*action.commitment(), position);
-                            }
-                        }
-                    }
+/// Use placeholder positions when we can't get real position information
+fn use_placeholder_positions(
+    transactions: &mut HashMap<TxId, zewif::Transaction>,
+) -> Result<()> {
+    eprintln!("Using placeholder positions for outputs (not ideal for production)");
+    
+    // Map to collect all actions and their placeholder positions
+    let mut orchard_positions: HashMap<u256, Position> = HashMap::new();
+    let mut sapling_positions: HashMap<u256, Position> = HashMap::new();
+    
+    // Create sequential placeholder positions
+    let mut position_counter: u32 = 1; // Start from 1 to avoid Position(0)
+    
+    // First pass: collect all commitments and assign sequential positions
+    for tx in transactions.values() {
+        // Process Orchard actions
+        if let Some(orchard_actions) = tx.orchard_actions() {
+            for action in orchard_actions {
+                let commitment = *action.commitment();
+                if let std::collections::hash_map::Entry::Vacant(e) = orchard_positions.entry(commitment) {
+                    e.insert(Position::from(position_counter));
+                    position_counter += 1;
                 }
             }
-
-            // Also process Sapling outputs
-            if let Some(sapling_outputs) = zewif_tx.sapling_outputs() {
-                for (idx, output) in sapling_outputs.iter().enumerate() {
-                    // If we have sapling note data, use that to set positions
-                    if let Some(sapling_note_data) = zcashd_tx.sapling_note_data() {
-                        for (outpoint, note_data) in sapling_note_data.iter() {
-                            // Check if this output matches our index
-                            if outpoint.vout() == idx as u32 {
-                                // Get position information from the witnesses if available
-                                if !note_data.witnesses().is_empty() {
-                                    // Use the most recent witness, which is typically the first one
-                                    // In a real implementation, we'd select the appropriate witness
-                                    // based on anchor height or other criteria
-                                    let _witness = &note_data.witnesses()[0];
-
-                                    // Create a position using the witness information
-                                    // For now, just use a placeholder based on the index
-                                    let position = Position::from(idx + 1); // Placeholder, starting from 1
-
-                                    // Create a new output with the updated position
-                                    let mut updated_output = output.clone();
-                                    updated_output.set_note_commitment_tree_position(position);
-
-                                    // Again, we can't update the output directly due to immutable reference
-                                    // For a real implementation, we'd need a mutable access method
-
-                                    // Record the position for later use
-                                    commitment_positions.insert(*output.commitment(), position);
-                                }
-                            }
-                        }
-                    }
+        }
+        
+        // Process Sapling outputs
+        if let Some(sapling_outputs) = tx.sapling_outputs() {
+            for output in sapling_outputs {
+                let commitment = *output.commitment();
+                if let std::collections::hash_map::Entry::Vacant(e) = sapling_positions.entry(commitment) {
+                    e.insert(Position::from(position_counter));
+                    position_counter += 1;
                 }
             }
         }
     }
+    
+    // Second pass: update the transactions with our placeholder positions
+    let mut all_positions = HashMap::new();
+    all_positions.extend(orchard_positions);
+    all_positions.extend(sapling_positions);
+    
+    update_transactions_with_positions(transactions, &all_positions)?;
+    
+    Ok(())
+}
 
-    // After collecting all positions, we'd need a way to update the transactions with these values
-    // In a full implementation, we would use a mutable access method to update the specific actions/outputs
-    // For now, this serves as a structural proof of concept
-
+/// Update transaction outputs with positions from a position map
+fn update_transactions_with_positions(
+    transactions: &mut HashMap<TxId, zewif::Transaction>,
+    commitment_positions: &HashMap<u256, Position>,
+) -> Result<()> {
+    // If we have no positions, there's nothing to do
+    if commitment_positions.is_empty() {
+        eprintln!("No commitment positions found to update transactions");
+        return Ok(());
+    }
+    
+    // Log how many positions we found for debugging
+    eprintln!("Found {} commitment positions to apply to transactions", commitment_positions.len());
+    
+    // For each transaction, update its outputs with the correct positions
+    for (_tx_id, tx) in transactions.iter_mut() {
+        // Get mutable access to the transaction components
+        
+        // Update Orchard actions with positions
+        let orchard_actions = tx.orchard_actions_mut();
+        if let Some(actions) = orchard_actions {
+            for action in actions {
+                let commitment = action.commitment();
+                if let Some(position) = commitment_positions.get(commitment) {
+                    action.set_note_commitment_tree_position(*position);
+                }
+            }
+        }
+        
+        // Update Sapling outputs with positions
+        let sapling_outputs = tx.sapling_outputs_mut();
+        if let Some(outputs) = sapling_outputs {
+            for output in outputs {
+                let commitment = output.commitment();
+                if let Some(position) = commitment_positions.get(commitment) {
+                    output.set_note_commitment_tree_position(*position);
+                }
+            }
+        }
+    }
+    
     Ok(())
 }
 
