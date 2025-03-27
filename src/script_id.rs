@@ -1,10 +1,10 @@
 use anyhow::Result;
 use zcash_address::{ToAddress, ZcashAddress};
 
-use zewif::{parse, parser::prelude::*};
 use zewif::{Network, u160};
+use zewif::{parse, parser::prelude::*};
 
-use super::zewif_network_to_zcash_address_network;
+use crate::migrate::primitives::address_network_from_zewif;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ScriptId(u160);
@@ -16,7 +16,8 @@ impl ScriptId {
         script_hash.copy_from_slice(self.0.as_ref());
 
         // Create a transparent P2SH address using the proper constructor
-        let addr = ZcashAddress::from_transparent_p2sh(zewif_network_to_zcash_address_network(network), script_hash);
+        let addr =
+            ZcashAddress::from_transparent_p2sh(address_network_from_zewif(network), script_hash);
         addr.to_string()
     }
 }

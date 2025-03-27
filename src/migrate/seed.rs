@@ -1,5 +1,5 @@
-use anyhow::Result;
 use crate::ZcashdWallet;
+use anyhow::Result;
 
 /// Convert ZCashd mnemonic seed to Zewif SeedMaterial
 pub fn convert_seed_material(wallet: &ZcashdWallet) -> Result<Option<zewif::SeedMaterial>> {

@@ -9,7 +9,6 @@ mod_use!(key_metadata);
 mod_use!(key_pool);
 mod_use!(key);
 mod_use!(keys);
-mod_use!(migrate);
 mod_use!(mnemonic_hd_chain);
 mod_use!(network_info);
 mod_use!(priv_key);
@@ -23,7 +22,8 @@ mod_use!(tx);
 mod_use!(unified_account_metadata);
 mod_use!(unified_accounts);
 mod_use!(unified_address_metadata);
-mod_use!(utils);
 mod_use!(zcashd_dump);
 mod_use!(zcashd_parser);
 mod_use!(zcashd_wallet);
+
+pub(crate) mod migrate;
