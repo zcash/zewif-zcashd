@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, bail};
+use hex::ToHex as _;
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
@@ -28,19 +29,21 @@ use crate::{
 pub struct ZcashdParser<'a> {
     pub dump: &'a ZcashdDump,
     pub unparsed_keys: RefCell<HashSet<DBKey>>,
+    pub strict: bool,
 }
 
 impl<'a> ZcashdParser<'a> {
-    pub fn parse_dump(dump: &ZcashdDump) -> Result<(ZcashdWallet, HashSet<DBKey>)> {
-        let parser = ZcashdParser::new(dump);
+    pub fn parse_dump(dump: &ZcashdDump, strict: bool) -> Result<(ZcashdWallet, HashSet<DBKey>)> {
+        let parser = ZcashdParser::new(dump, strict);
         parser.parse()
     }
 
-    fn new(dump: &'a ZcashdDump) -> Self {
+    fn new(dump: &'a ZcashdDump, strict: bool) -> Self {
         let unparsed_keys = RefCell::new(dump.records().keys().cloned().collect());
         Self {
             dump,
             unparsed_keys,
+            strict,
         }
     }
 
@@ -116,7 +119,7 @@ impl<'a> ZcashdParser<'a> {
         let sapling_keys = self.parse_sapling_keys()?;
 
         // tx
-        let transactions = self.parse_transactions()?;
+        let transactions = self.parse_transactions(self.strict)?;
 
         // **version**
         let client_version = self.parse_client_version("version")?;
@@ -602,7 +605,7 @@ impl<'a> ZcashdParser<'a> {
         Ok(key_pool)
     }
 
-    fn parse_transactions(&self) -> Result<HashMap<TxId, WalletTx>> {
+    fn parse_transactions(&self, strict: bool) -> Result<HashMap<TxId, WalletTx>> {
         let mut transactions = HashMap::new();
         // Some wallet files don't have any transactions
         if self.dump.has_keys_for_keyname("tx") {
@@ -615,11 +618,24 @@ impl<'a> ZcashdParser<'a> {
             for (key, value) in sorted_records {
                 let txid = parse!(buf = &key.data, TxId, "transaction ID")?;
                 let trace = false;
-                let transaction = parse!(buf = value.as_data(), WalletTx, "transaction", trace)?;
-                if transactions.contains_key(&txid) {
-                    bail!("Duplicate transaction found: {:?}", txid);
+                match parse!(buf = value.as_data(), WalletTx, "transaction", trace) {
+                    Ok(transaction) => {
+                        if transactions.contains_key(&txid) {
+                            bail!("Duplicate transaction found: {:?}", txid);
+                        }
+                        transactions.insert(txid, transaction);
+                    }
+                    Err(e) if !strict => {
+                        eprintln!(
+                            "Unable to parse transaction data {}: {}",
+                            value.as_data().encode_hex::<String>(),
+                            e
+                        );
+                    }
+                    err => {
+                        err?;
+                    }
                 }
-                transactions.insert(txid, transaction);
 
                 self.mark_key_parsed(&key);
             }

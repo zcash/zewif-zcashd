@@ -108,9 +108,8 @@ impl ZcashdDump {
                 }
                 Err(e) if !strict => {
                     eprintln!(
-                        "Unable to parse key/value pair {} / {}: {}",
+                        "Unable to parse database key {}: {}",
                         key_data.encode_hex::<String>(),
-                        value_data.encode_hex::<String>(),
                         e
                     );
                 }
