@@ -8,7 +8,8 @@ use zewif::{self, Account, Position, TxId, ZewifTop, ZewifWallet, u256};
 
 use super::{
     convert_sapling_addresses, convert_seed_material, convert_transactions,
-    convert_transparent_addresses, convert_unified_accounts, initialize_address_registry,
+    convert_transparent_addresses, convert_unified_accounts, convert_unified_addresses,
+    initialize_address_registry,
 };
 
 /// Migrate a ZCashd wallet to the Zewif wallet format
@@ -64,6 +65,14 @@ pub fn migrate_to_zewif(wallet: &ZcashdWallet) -> Result<ZewifTop> {
 
         // Convert sapling addresses using the registry to assign to correct accounts
         convert_sapling_addresses(
+            wallet,
+            &mut default_account,
+            Some(&address_registry),
+            &mut accounts_map_ref,
+        )?;
+
+        // Convert unified addresses using the registry to assign to correct accounts
+        convert_unified_addresses(
             wallet,
             &mut default_account,
             Some(&address_registry),

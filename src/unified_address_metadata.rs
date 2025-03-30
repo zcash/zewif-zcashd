@@ -1,9 +1,7 @@
 use anyhow::Result;
 
 use zewif::{parse, parser::prelude::*};
-use zewif::{Blob, u256};
-
-use super::ReceiverType;
+use zewif::{Blob, ReceiverType, u256};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UnifiedAddressMetadata {

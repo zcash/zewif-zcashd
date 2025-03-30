@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use zewif::{parse, parser::prelude::*};
-use super::{KeyId, OrchardRawAddress, ReceiverType, SaplingZPaymentAddress, ScriptId};
+use zewif::{parse, parser::prelude::*, ReceiverType};
+use super::{KeyId, OrchardRawAddress, SaplingZPaymentAddress, ScriptId};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RecipientAddress {

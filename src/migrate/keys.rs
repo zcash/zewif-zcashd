@@ -17,9 +17,8 @@ pub fn find_sapling_key_for_ivk<'a>(
 pub fn convert_sapling_spending_key(
     key: &zewif::sapling::SaplingExtendedSpendingKey,
 ) -> Result<zewif::SpendingKey> {
-    // Create the Sapling spending key with all components including HD parameters
-    // Since both structures use u256, we can directly use them without cloning
-    let spending_key = zewif::SpendingKey::new_sapling_extended(
+    // Create a SaplingSpendingKey with all components including HD parameters
+    let sapling_key = zewif::sapling::SaplingSpendingKey::new_extended(
         key.expsk.ask,
         key.expsk.nsk,
         key.expsk.ovk,
@@ -29,6 +28,9 @@ pub fn convert_sapling_spending_key(
         key.chain_code,
         key.dk,
     );
+
+    // Create the SpendingKey wrapper
+    let spending_key = zewif::SpendingKey::Sapling(sapling_key);
 
     Ok(spending_key)
 }

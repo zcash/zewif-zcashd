@@ -15,7 +15,6 @@ mod_use!(mnemonic_hd_chain);
 mod_use!(network_info);
 mod_use!(priv_key);
 mod_use!(pub_key);
-mod_use!(receiver_type);
 mod_use!(recipient_address);
 mod_use!(recipient_mapping);
 mod_use!(script_id);
