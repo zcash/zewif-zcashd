@@ -5,8 +5,8 @@ use zewif::{parse, parser::prelude::*};
 
 use super::JSDescription;
 
-blob!(Ed25519Signature, 64);
-blob!(Ed25519VerificationKey, 32);
+blob!(Ed25519Signature, 64, "An Ed25519 signature used in Zcash transactions.");
+blob!(Ed25519VerificationKey, 32, "An Ed25519 verification key used in Zcash transactions.");
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct JoinSplits {

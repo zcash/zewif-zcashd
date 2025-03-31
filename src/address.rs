@@ -1,3 +1,3 @@
 use zewif::string;
 
-string!(Address);
+string!(Address, "A Zcash address.");
