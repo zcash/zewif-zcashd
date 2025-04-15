@@ -6,7 +6,7 @@ pub fn convert_seed_material(wallet: &ZcashdWallet) -> Result<Option<zewif::Seed
     // Check if we have a mnemonic phrase
     if !wallet.bip39_mnemonic().mnemonic().is_empty() {
         return Ok(Some(zewif::SeedMaterial::Bip39Mnemonic(
-            wallet.bip39_mnemonic().mnemonic().clone(),
+            wallet.bip39_mnemonic().clone(),
         )));
     }
     // If no mnemonic, return None

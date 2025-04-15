@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
-use anyhow::{Result, Context};
-use zewif::{u256, TxId};
 use crate::ZcashdWallet;
-
+use anyhow::{Context, Result};
+use zewif::{TxId, sapling::SaplingAnchorWitness, u256};
 
 /// Convert ZCashd transactions to Zewif format
 pub fn convert_transactions(wallet: &ZcashdWallet) -> Result<HashMap<TxId, zewif::Transaction>> {
@@ -54,7 +53,7 @@ fn convert_transaction(tx_id: TxId, tx: &crate::WalletTx) -> Result<zewif::Trans
     }
 
     // Convert transparent inputs
-    for tx_in in tx.vin() {
+    for tx_in in tx.vin().iter() {
         let zewif_tx_in = zewif::TxIn::new(
             zewif::TxOutPoint::new(tx_in.prevout().txid(), tx_in.prevout().vout()),
             tx_in.script_sig().clone(),
@@ -64,7 +63,7 @@ fn convert_transaction(tx_id: TxId, tx: &crate::WalletTx) -> Result<zewif::Trans
     }
 
     // Convert transparent outputs
-    for tx_out in tx.vout() {
+    for tx_out in tx.vout().iter() {
         let amount = tx_out.value();
         let script_pubkey = tx_out.script_pub_key().clone();
 
@@ -79,9 +78,8 @@ fn convert_transaction(tx_id: TxId, tx: &crate::WalletTx) -> Result<zewif::Trans
     match tx.sapling_bundle() {
         crate::SaplingBundle::V4(bundle_v4) => {
             // Convert Sapling spends
-            for (idx, spend) in bundle_v4.spends().iter().enumerate() {
+            for spend in bundle_v4.spends().iter() {
                 let mut sapling_spend = zewif::sapling::SaplingSpendDescription::new();
-                sapling_spend.set_spend_index(idx as u32);
                 sapling_spend.set_value(Some(bundle_v4.amount()));
                 sapling_spend.set_nullifier(spend.nullifier());
                 sapling_spend.set_zkproof(spend.zkproof().clone());
@@ -95,7 +93,6 @@ fn convert_transaction(tx_id: TxId, tx: &crate::WalletTx) -> Result<zewif::Trans
             // Convert Sapling outputs
             for (idx, output) in bundle_v4.outputs().iter().enumerate() {
                 let mut sapling_output = zewif::sapling::SaplingOutputDescription::new();
-                sapling_output.set_output_index(idx as u32);
                 sapling_output.set_commitment(output.cmu());
                 sapling_output.set_ephemeral_key(output.ephemeral_key());
                 sapling_output.set_enc_ciphertext(output.enc_ciphertext().clone());
@@ -114,7 +111,10 @@ fn convert_transaction(tx_id: TxId, tx: &crate::WalletTx) -> Result<zewif::Trans
                                     // Since we don't have direct access to it, we'll create a placeholder
                                     // for now and improve it in a future implementation
                                     let anchor = u256::default();
-                                    sapling_output.set_witness(Some((anchor, witness.clone())));
+                                    sapling_output.set_witness(Some(SaplingAnchorWitness::new(
+                                        anchor,
+                                        witness.clone(),
+                                    )));
                                 }
                             }
 
@@ -135,9 +135,8 @@ fn convert_transaction(tx_id: TxId, tx: &crate::WalletTx) -> Result<zewif::Trans
         }
         crate::SaplingBundle::V5(bundle_v5) => {
             // Processing for V5 bundles
-            for (idx, spend) in bundle_v5.shielded_spends().iter().enumerate() {
+            for spend in bundle_v5.shielded_spends().iter() {
                 let mut sapling_spend = zewif::sapling::SaplingSpendDescription::new();
-                sapling_spend.set_spend_index(idx as u32);
                 sapling_spend.set_nullifier(spend.nullifier());
                 sapling_spend.set_zkproof(spend.zkproof().clone());
 
@@ -149,7 +148,6 @@ fn convert_transaction(tx_id: TxId, tx: &crate::WalletTx) -> Result<zewif::Trans
 
             for (idx, output) in bundle_v5.shielded_outputs().iter().enumerate() {
                 let mut sapling_output = zewif::sapling::SaplingOutputDescription::new();
-                sapling_output.set_output_index(idx as u32);
                 sapling_output.set_commitment(output.cmu());
                 sapling_output.set_ephemeral_key(output.ephemeral_key());
                 sapling_output.set_enc_ciphertext(output.enc_ciphertext().clone());
@@ -167,7 +165,10 @@ fn convert_transaction(tx_id: TxId, tx: &crate::WalletTx) -> Result<zewif::Trans
                                     // We'll use a default anchor value for now and improve this
                                     // in a future implementation
                                     let anchor = u256::default();
-                                    sapling_output.set_witness(Some((anchor, witness.clone())));
+                                    sapling_output.set_witness(Some(SaplingAnchorWitness::new(
+                                        anchor,
+                                        witness.clone(),
+                                    )));
                                 }
                             }
 
@@ -195,7 +196,6 @@ fn convert_transaction(tx_id: TxId, tx: &crate::WalletTx) -> Result<zewif::Trans
 
         for (idx, action) in orchard_bundle.actions.iter().enumerate() {
             let mut orchard_action = zewif::OrchardActionDescription::new();
-            orchard_action.set_action_index(idx as u32);
             orchard_action.set_nullifier(action.nf_old());
             orchard_action.set_commitment(action.cmx());
             orchard_action.set_enc_ciphertext(action.encrypted_note().enc_ciphertext().clone());

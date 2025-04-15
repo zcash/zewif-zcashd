@@ -1,13 +1,15 @@
+use std::collections::HashSet;
+
 use anyhow::Result;
 
 use zewif::{parse, parser::prelude::*};
 use zewif::{Blob, ReceiverType, u256};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnifiedAddressMetadata {
     pub key_id: u256,
     pub diversifier_index: Blob<11>,
-    pub receiver_types: Vec<ReceiverType>,
+    pub receiver_types: HashSet<ReceiverType>,
 }
 
 impl Parse for UnifiedAddressMetadata {

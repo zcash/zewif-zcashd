@@ -1,12 +1,11 @@
 use anyhow::Result;
 
 use zewif::{parse, parser::prelude::*};
-use zewif::{Network, network_for_identifier};
+use zewif::Network;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct NetworkInfo {
     zcash: String,
-    identifier: String,
     network: Network,
 }
 
@@ -15,8 +14,8 @@ impl NetworkInfo {
         &self.zcash
     }
 
-    pub fn identifier(&self) -> &str {
-        &self.identifier
+    pub fn identifier(&self) -> String {
+        self.network.into()
     }
 
     pub fn network(&self) -> Network {
@@ -27,7 +26,7 @@ impl NetworkInfo {
 impl Parse for NetworkInfo {
     fn parse(p: &mut Parser) -> Result<Self> {
         let (zcash, identifier): (String, String) = parse!(p, "(zcash, identifier)")?;
-        let network = network_for_identifier(&identifier)?;
-        Ok(Self { zcash, identifier, network })
+        let network = Network::try_from(identifier)?;
+        Ok(Self { zcash, network })
     }
 }

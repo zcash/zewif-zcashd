@@ -2,7 +2,6 @@ use zewif::mod_use;
 
 mod_use!(address);
 mod_use!(bdb_dump);
-mod_use!(bip_39_mnemonic);
 mod_use!(block_locator);
 mod_use!(client_version);
 mod_use!(key_id);
