@@ -1,15 +1,14 @@
 use anyhow::{Context, Result};
-
 use std::collections::{HashMap, HashSet};
 
 use zcash_primitives::consensus::NetworkType;
-use zewif::{Account, AddressId, AddressRegistry, ProtocolAddress, TxId, u256};
-
-use crate::ZcashdWallet;
+use zewif::{Account, ProtocolAddress, TxId, u256};
 
 use super::{
-    keys::{convert_sapling_spending_key, find_sapling_key_for_ivk}, primitives::convert_network, transaction_addresses::extract_transaction_addresses
+    AddressId, AddressRegistry, keys::convert_sapling_spending_key, keys::find_sapling_key_for_ivk,
+    primitives::convert_network, transaction_addresses::extract_transaction_addresses,
 };
+use crate::ZcashdWallet;
 
 /// Convert ZCashd UnifiedAccounts to Zewif accounts
 pub fn convert_unified_accounts(

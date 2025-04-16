@@ -1,12 +1,13 @@
-use anyhow::{Result, Context};
-
+use anyhow::{Context, Result};
 use std::collections::HashMap;
 
-use zewif::{u256, Account, AddressId, AddressRegistry, ProtocolAddress, UnifiedAddress};
+use zewif::{Account, ProtocolAddress, UnifiedAddress, u256};
 
-use crate::ZcashdWallet;
-
-use super::keys::{convert_sapling_spending_key, find_sapling_key_for_ivk};
+use super::{convert_sapling_spending_key, keys::find_sapling_key_for_ivk};
+use crate::{
+    ZcashdWallet,
+    migrate::{AddressId, AddressRegistry},
+};
 
 /// Convert ZCashd transparent addresses to Zewif format
 ///
@@ -157,7 +158,7 @@ pub fn convert_unified_addresses(
         // NOTE: The wallet.dat file does NOT store the complete unified address strings directly.
         // Instead, it stores the metadata (key_id, diversifier_index, receiver_types) needed to
         // derive the actual unified addresses at runtime when the wallet is operational.
-        // 
+        //
         // In a fully-operational wallet, unified addresses would be derived using:
         // 1. The wallet's keys (spending or viewing keys)
         // 2. The diversifier index stored here
@@ -192,10 +193,10 @@ pub fn convert_unified_addresses(
             id_bytes // In case the bytes are somehow shorter than 4
         };
         zewif_address.set_name(format!("Unified Address {}", hex::encode(id_prefix)));
-        
+
         // Set purpose if available - though we may not have explicit purposes for unified addresses
         // in current wallet structure, this is here for future compatibility
-        
+
         // In multi-account mode, try to assign to the correct account
         let mut assigned = false;
 
@@ -234,3 +235,4 @@ pub fn convert_unified_addresses(
 
     Ok(())
 }
+
