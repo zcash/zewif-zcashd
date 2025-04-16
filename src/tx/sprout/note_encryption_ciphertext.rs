@@ -11,4 +11,8 @@ pub const MLEN: usize = NOTEPLAINTEXT_SIZE;
 pub const NOTEENCRYPTION_AUTH_BYTES: usize = 16;
 pub const CLEN: usize = MLEN + NOTEENCRYPTION_AUTH_BYTES;
 
-blob!(NoteEncryptionCiphertext, CLEN, "A ciphertext for a note encryption in Zcash transactions.");
+blob!(
+    NoteEncryptionCiphertext,
+    CLEN,
+    "A ciphertext for a note encryption in Zcash transactions."
+);

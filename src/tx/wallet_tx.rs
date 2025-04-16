@@ -6,9 +6,7 @@ use zewif::{parse, parser::prelude::*};
 
 use super::{OrchardTxMeta, SaplingBundleV5, ZIP225_TX_VERSION};
 
-use zewif::{
-    BranchId, CompactSize, Data, ExpiryHeight, u256,
-};
+use zewif::{BranchId, CompactSize, Data, ExpiryHeight, u256};
 
 use super::{
     JSOutPoint, JoinSplits, LockTime, OrchardBundle, SAPLING_TX_VERSION, SaplingBundle,

@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use zewif::{parse, parser::prelude::*};
 use zewif::TxId;
+use zewif::{parse, parser::prelude::*};
 
 pub type SaplingOutPoint = OutPoint;
 

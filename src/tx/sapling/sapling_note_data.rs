@@ -1,7 +1,10 @@
 use anyhow::Result;
 
 use zewif::{parse, parser::prelude::*};
-use zewif::{sapling::{SaplingIncomingViewingKey, SaplingWitness}, u256};
+use zewif::{
+    sapling::{SaplingIncomingViewingKey, SaplingWitness},
+    u256,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SaplingNoteData {

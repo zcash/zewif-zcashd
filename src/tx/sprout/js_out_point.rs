@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use zewif::{parse, parser::prelude::*};
 use zewif::u256;
+use zewif::{parse, parser::prelude::*};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct JSOutPoint {

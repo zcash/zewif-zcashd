@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use zewif::{parse, parser::prelude::*};
 use zewif::{Amount, Anchor, SproutProof, u256};
+use zewif::{parse, parser::prelude::*};
 
 use super::NoteEncryptionCiphertext;
 

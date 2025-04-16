@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use zewif::{parse, parser::prelude::*};
 use zewif::{Amount, Blob64};
+use zewif::{parse, parser::prelude::*};
 
 use super::super::{OutputV4, SpendV4};
 

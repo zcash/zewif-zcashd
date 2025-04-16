@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use zewif::{parse, parser::prelude::*};
 use zewif::Data;
+use zewif::{parse, parser::prelude::*};
 
 use super::RedPallasSignature;
 
@@ -13,10 +13,7 @@ pub struct OrchardAuthorized {
 
 impl OrchardAuthorized {
     pub fn new(proof: Data, binding_signature: RedPallasSignature) -> Self {
-        Self {
-            proof,
-            binding_signature,
-        }
+        Self { proof, binding_signature }
     }
 
     pub fn proof(&self) -> &Data {

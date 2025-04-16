@@ -125,52 +125,52 @@ pub fn convert_unified_accounts(
         }
     }
 
-    // Step 4: Log information about viewing keys in unified_accounts
-    // Each full_viewing_key entry maps a key_id to a viewing key string
-    for (key_id, viewing_key_str) in &unified_accounts.full_viewing_keys {
-        // Find the account for this key_id
-        if let Some(account) = accounts_map.get_mut(key_id) {
-            // Different viewing key formats have different prefixes
-            // For example, "zxviews..." for Sapling, etc.
-            
-            // Log the viewing key based on its type (determined by prefix)
-            if viewing_key_str.starts_with("zxviews") {
-                // This is a Sapling viewing key format
-                eprintln!(
-                    "Found Sapling viewing key for account {}: {}",
-                    account.name(),
-                    viewing_key_str
-                );
-            } else if viewing_key_str.starts_with("zxorchard") {
-                // This is an Orchard viewing key format
-                eprintln!(
-                    "Found Orchard viewing key for account {}: {}",
-                    account.name(),
-                    viewing_key_str
-                );
-            } else if viewing_key_str.starts_with("zxunified") {
-                // This is a unified viewing key
-                eprintln!(
-                    "Found Unified viewing key for account {}: {}",
-                    account.name(),
-                    viewing_key_str
-                );
-            } else {
-                // Unknown viewing key format
-                eprintln!(
-                    "Found viewing key with unknown format for account {}: {}",
-                    account.name(),
-                    viewing_key_str
-                );
-            }
+    // // Step 4: Log information about viewing keys in unified_accounts
+    // // Each full_viewing_key entry maps a key_id to a viewing key string
+    // for (key_id, viewing_key_str) in &unified_accounts.full_viewing_keys {
+    //     // Find the account for this key_id
+    //     if let Some(account) = accounts_map.get_mut(key_id) {
+    //         // Different viewing key formats have different prefixes
+    //         // For example, "zxviews..." for Sapling, etc.
 
-            // Use the registry to find all addresses associated with this account
-            let account_addresses = address_registry.find_addresses_for_account(key_id);
-            if !account_addresses.is_empty() {
-                eprintln!("  Account has {} addresses", account_addresses.len());
-            }
-        }
-    }
+    //         // Log the viewing key based on its type (determined by prefix)
+    //         if viewing_key_str.starts_with("zxviews") {
+    //             // This is a Sapling viewing key format
+    //             eprintln!(
+    //                 "Found Sapling viewing key for account {}: {}",
+    //                 account.name(),
+    //                 viewing_key_str
+    //             );
+    //         } else if viewing_key_str.starts_with("zxorchard") {
+    //             // This is an Orchard viewing key format
+    //             eprintln!(
+    //                 "Found Orchard viewing key for account {}: {}",
+    //                 account.name(),
+    //                 viewing_key_str
+    //             );
+    //         } else if viewing_key_str.starts_with("zxunified") {
+    //             // This is a unified viewing key
+    //             eprintln!(
+    //                 "Found Unified viewing key for account {}: {}",
+    //                 account.name(),
+    //                 viewing_key_str
+    //             );
+    //         } else {
+    //             // Unknown viewing key format
+    //             eprintln!(
+    //                 "Found viewing key with unknown format for account {}: {}",
+    //                 account.name(),
+    //                 viewing_key_str
+    //             );
+    //         }
+
+    //         // Use the registry to find all addresses associated with this account
+    //         let account_addresses = address_registry.find_addresses_for_account(key_id);
+    //         if !account_addresses.is_empty() {
+    //             eprintln!("  Account has {} addresses", account_addresses.len());
+    //         }
+    //     }
+    // }
 
     // Step 5: Assign transactions to relevant accounts based on address involvement
     // We'll use our AddressRegistry to find account associations

@@ -9,8 +9,6 @@ anyhow = "1.0.95"
 chrono = "0.4.39"
 hex = "0.4.3"
 sha2 = "^0.10.6"
-# bc-components = "^0.18.0"
-# bc-envelope = "^0.25.0"
 zcash_address = { git = "https://github.com/zingolabs/librustzcash.git", tag = "zcash_client_sqlite-0.12.1_plus_zingolabs_changes-test_2" }
 ripemd = "0.1.3"
 byteorder = "1.5.0"

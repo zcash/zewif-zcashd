@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use zewif::{parse, parser::prelude::*};
 use zewif::{Amount, Blob32, Data};
+use zewif::{parse, parser::prelude::*};
 
 use super::{OrchardAction, OrchardAuthorized, OrchardFlags};
 
@@ -60,8 +60,7 @@ impl Parse for OrchardBundle {
             .collect::<Result<Vec<OrchardAction>>>()?;
 
         let binding_sig = parse!(p, "binding_sig")?;
-        let authorization =
-            OrchardAuthorized::new(proof_bytes, binding_sig);
+        let authorization = OrchardAuthorized::new(proof_bytes, binding_sig);
 
         Ok(Self(Some(OrchardBundleInner {
             actions,

@@ -1,7 +1,7 @@
 use anyhow::{Result, bail};
 
-use zewif::{parse, parser::prelude::*};
 use zewif::IntID;
+use zewif::{parse, parser::prelude::*};
 
 const OVERWINTER_VERSION_GROUP_ID: IntID = IntID::new(0x03c48270);
 const OVERWINTER_TX_VERSION: u32 = 3;

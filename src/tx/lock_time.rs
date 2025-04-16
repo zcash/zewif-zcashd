@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use zewif::{parse, parser::prelude::*};
 use zewif::SecondsSinceEpoch;
+use zewif::{parse, parser::prelude::*};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum LockTime {

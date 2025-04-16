@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use zewif::{parse, parser::prelude::*};
 use zewif::{Blob, GrothProof, u256};
+use zewif::{parse, parser::prelude::*};
 
 const COMPACT_NOTE_SIZE: usize = 1 + // version
     11 + // diversifier

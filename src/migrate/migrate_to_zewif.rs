@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::ZcashdWallet;
 
-use zewif::{self, Account, Position, TxId, ZewifTop, ZewifWallet, u256};
+use zewif::{self, Account, Position, TxId, Zewif, ZewifWallet, u256};
 
 use super::{
     convert_sapling_addresses, convert_seed_material, convert_transactions,
@@ -13,9 +13,9 @@ use super::{
 };
 
 /// Migrate a ZCashd wallet to the Zewif wallet format
-pub fn migrate_to_zewif(wallet: &ZcashdWallet) -> Result<ZewifTop> {
-    // Create a new ZewifTop
-    let mut zewif_top = ZewifTop::new();
+pub fn migrate_to_zewif(wallet: &ZcashdWallet) -> Result<Zewif> {
+    // Create a new Zewif
+    let mut zewif = Zewif::new();
 
     // Convert seed material (mnemonic phrase)
     let seed_material = convert_seed_material(wallet)?;
@@ -111,11 +111,11 @@ pub fn migrate_to_zewif(wallet: &ZcashdWallet) -> Result<ZewifTop> {
         zewif_wallet.add_account(default_account);
     }
 
-    // Add wallet and transactions to the ZewifTop
-    zewif_top.add_wallet(zewif_wallet);
-    zewif_top.set_transactions(transactions);
+    // Add wallet and transactions to the Zewif
+    zewif.add_wallet(zewif_wallet);
+    zewif.set_transactions(transactions);
 
-    Ok(zewif_top)
+    Ok(zewif)
 }
 
 /// Update transaction outputs with note positions from the note commitment tree
@@ -260,7 +260,7 @@ fn update_transactions_with_positions(
     Ok(())
 }
 
-impl From<&ZcashdWallet> for Result<ZewifTop> {
+impl From<&ZcashdWallet> for Result<Zewif> {
     fn from(wallet: &ZcashdWallet) -> Self {
         migrate_to_zewif(wallet)
     }

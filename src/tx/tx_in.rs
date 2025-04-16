@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use zewif::{parse, parser::prelude::*};
 use zewif::Script;
+use zewif::{parse, parser::prelude::*};
 
 use super::OutPoint;
 
