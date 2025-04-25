@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-zewif = { path = "../zewif" }
+zewif = "0.1.0"
 anyhow = "1.0.95"
 chrono = "0.4.39"
 hex = "0.4.3"
@@ -16,3 +16,6 @@ byteorder = "1.5.0"
 [features]
 default = []
 with-context = []
+
+[patch.crates-io]
+zewif = { git = "https://github.com/BlockchainCommons/zewif.git", rev = "7fe8ee3f2c28468684b6a2195b4cd358ca8fff3c" }
