@@ -15,6 +15,8 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@beta
         id: toolchain
+        with:
+          components: clippy
       - run: rustup override set "${TOOLCHAIN}"
         shell: sh
         env:
