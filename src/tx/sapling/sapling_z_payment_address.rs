@@ -4,7 +4,7 @@ use zcash_address::{ToAddress, ZcashAddress};
 use zewif::{Blob, Network};
 use zewif::{parse, parser::prelude::*};
 
-use crate::zewif_network_to_zcash_address_network;
+use crate::migrate::primitives::address_network_from_zewif;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SaplingZPaymentAddress {
@@ -18,8 +18,7 @@ impl SaplingZPaymentAddress {
         let mut bytes = [0u8; 43];
         bytes[..11].copy_from_slice(self.diversifier.as_slice());
         bytes[11..].copy_from_slice(self.pk.as_slice());
-        let addr =
-            ZcashAddress::from_sapling(zewif_network_to_zcash_address_network(network), bytes);
+        let addr = ZcashAddress::from_sapling(address_network_from_zewif(network), bytes);
         addr.to_string()
     }
 

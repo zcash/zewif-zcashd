@@ -1,12 +1,15 @@
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 
 use std::collections::{HashMap, HashSet};
 
-use zewif::{u256, Account, AddressId, AddressRegistry, ProtocolAddress, TxId};
+use zcash_primitives::consensus::NetworkType;
+use zewif::{Account, AddressId, AddressRegistry, ProtocolAddress, TxId, u256};
 
 use crate::ZcashdWallet;
 
-use super::{keys::{convert_sapling_spending_key, find_sapling_key_for_ivk}, transaction_addresses::extract_transaction_addresses};
+use super::{
+    keys::{convert_sapling_spending_key, find_sapling_key_for_ivk}, primitives::convert_network, transaction_addresses::extract_transaction_addresses
+};
 
 /// Convert ZCashd UnifiedAccounts to Zewif accounts
 pub fn convert_unified_accounts(
@@ -193,7 +196,9 @@ pub fn convert_unified_accounts(
                 // First pass: Look for explicit account mappings from standard addresses
                 for address_str in &tx_addresses {
                     // Check for standard addresses that we can convert to AddressId
-                    if let Ok(addr_id) = AddressId::from_address_string(address_str, wallet.network()) {
+                    if let Ok(addr_id) =
+                        AddressId::from_address_string(address_str, wallet.network())
+                    {
                         // Look up the account in our registry
                         if let Some(account_id) = address_registry.find_account(&addr_id) {
                             relevant_accounts.insert(*account_id);
@@ -205,35 +210,46 @@ pub fn convert_unified_accounts(
                 if relevant_accounts.is_empty() {
                     for address_str in &tx_addresses {
                         // Check for more specific tagged addresses
-                        if address_str.starts_with("transparent_spend:") ||
-                           address_str.starts_with("sapling_spend:") ||
-                           address_str.starts_with("orchard_spend:") {
+                        if address_str.starts_with("transparent_spend:")
+                            || address_str.starts_with("sapling_spend:")
+                            || address_str.starts_with("orchard_spend:")
+                        {
                             // This is a spending address - may indicate source account
                             let pure_addr = &address_str[(address_str.find(':').unwrap() + 1)..];
-                            if let Ok(addr_id) = AddressId::from_address_string(pure_addr, wallet.network()) {
+                            if let Ok(addr_id) =
+                                AddressId::from_address_string(pure_addr, wallet.network())
+                            {
                                 if let Some(account_id) = address_registry.find_account(&addr_id) {
                                     relevant_accounts.insert(*account_id);
                                 }
                             }
-                        } else if address_str.starts_with("transparent_output:") ||
-                                  address_str.starts_with("sapling_receive:") ||
-                                  address_str.starts_with("orchard_recipient:") {
+                        } else if address_str.starts_with("transparent_output:")
+                            || address_str.starts_with("sapling_receive:")
+                            || address_str.starts_with("orchard_recipient:")
+                        {
                             // This is a receiving address
                             let pure_addr = &address_str[(address_str.find(':').unwrap() + 1)..];
-                            if let Ok(addr_id) = AddressId::from_address_string(pure_addr, wallet.network()) {
+                            if let Ok(addr_id) =
+                                AddressId::from_address_string(pure_addr, wallet.network())
+                            {
                                 if let Some(account_id) = address_registry.find_account(&addr_id) {
                                     relevant_accounts.insert(*account_id);
                                 }
                             }
-                        } else if address_str.starts_with("change:") || address_str.starts_with("change_key:") || address_str.starts_with("change_output:") {
+                        } else if address_str.starts_with("change:")
+                            || address_str.starts_with("change_key:")
+                            || address_str.starts_with("change_output:")
+                        {
                             // This is a change address - try to find its account
                             let pure_addr = &address_str[(address_str.find(':').unwrap() + 1)..];
-                            if let Ok(addr_id) = AddressId::from_address_string(pure_addr, wallet.network()) {
+                            if let Ok(addr_id) =
+                                AddressId::from_address_string(pure_addr, wallet.network())
+                            {
                                 if let Some(account_id) = address_registry.find_account(&addr_id) {
                                     // For change, we add ONLY the source account
                                     relevant_accounts.clear();
                                     relevant_accounts.insert(*account_id);
-                                    break;  // Only need the source account for change
+                                    break; // Only need the source account for change
                                 }
                             }
                         }
@@ -245,12 +261,20 @@ pub fn convert_unified_accounts(
                     // Different strategies based on transaction type
                     if is_change_transaction {
                         // For change transactions, try to find the source account
-                        if let Some(source_account) = find_source_account_for_transaction(wallet_tx, &tx_addresses, &address_registry) {
+                        if let Some(source_account) = find_source_account_for_transaction(
+                            wallet_tx,
+                            &tx_addresses,
+                            &address_registry,
+                        ) {
                             relevant_accounts.insert(source_account);
                         }
                     } else if transaction_type == "send" {
                         // For send transactions with no clear mappings, look for the source
-                        if let Some(source_account) = find_source_account_for_transaction(wallet_tx, &tx_addresses, &address_registry) {
+                        if let Some(source_account) = find_source_account_for_transaction(
+                            wallet_tx,
+                            &tx_addresses,
+                            &address_registry,
+                        ) {
                             relevant_accounts.insert(source_account);
                         }
                     } else if transaction_type == "receive" {
@@ -312,16 +336,16 @@ fn find_source_account_for_transaction(
     address_registry: &AddressRegistry,
 ) -> Option<u256> {
     // Network for parsing addresses - use mainnet as default
-    let network = zewif::Network::Main; // WalletTx doesn't expose network directly
+    let network = convert_network(NetworkType::Main); // WalletTx doesn't expose network directly
 
     // For outgoing transactions, check if we have explicit spending addresses
     if wallet_tx.is_from_me() {
         for address_str in addresses {
             // First, look for explicitly tagged spend addresses
-            if address_str.starts_with("transparent_spend:") ||
-               address_str.starts_with("sapling_spend:") ||
-               address_str.starts_with("orchard_nullifier:") {
-
+            if address_str.starts_with("transparent_spend:")
+                || address_str.starts_with("sapling_spend:")
+                || address_str.starts_with("orchard_nullifier:")
+            {
                 let pure_addr = &address_str[(address_str.find(':').unwrap() + 1)..];
 
                 // Try to convert to AddressId and find its account
@@ -333,7 +357,10 @@ fn find_source_account_for_transaction(
             }
 
             // Next, check for change addresses (these are most reliable for source account)
-            if address_str.starts_with("change:") || address_str.starts_with("change_key:") || address_str.starts_with("change_output:") {
+            if address_str.starts_with("change:")
+                || address_str.starts_with("change_key:")
+                || address_str.starts_with("change_output:")
+            {
                 let pure_addr = &address_str[(address_str.find(':').unwrap() + 1)..];
 
                 if let Ok(addr_id) = AddressId::from_address_string(pure_addr, network) {
@@ -464,7 +491,10 @@ fn extract_account_id_from_keypath(keypath: &str) -> Option<u32> {
 }
 
 /// Find the account key ID based on account ID
-fn find_account_key_id_by_account_id(unified_accounts: &crate::UnifiedAccounts, account_id: u32) -> Option<u256> {
+fn find_account_key_id_by_account_id(
+    unified_accounts: &crate::UnifiedAccounts,
+    account_id: u32,
+) -> Option<u256> {
     for (key_id, account_metadata) in &unified_accounts.account_metadata {
         if account_metadata.account_id() == account_id {
             return Some(*key_id);
@@ -474,7 +504,10 @@ fn find_account_key_id_by_account_id(unified_accounts: &crate::UnifiedAccounts, 
 }
 
 /// Find the account key ID based on seed fingerprint
-fn find_account_key_id_by_seed_fingerprint(unified_accounts: &crate::UnifiedAccounts, seed_fp: &zewif::Blob32) -> Option<u256> {
+fn find_account_key_id_by_seed_fingerprint(
+    unified_accounts: &crate::UnifiedAccounts,
+    seed_fp: &zewif::Blob32,
+) -> Option<u256> {
     let seed_fp_hex = hex::encode(seed_fp.as_ref());
     for (key_id, account_metadata) in &unified_accounts.account_metadata {
         // Convert the account's seed fingerprint to hex and compare
@@ -508,7 +541,9 @@ pub fn initialize_address_registry(
         let addr_id = AddressId::Transparent(zcashd_address.clone().into());
 
         // Check key metadata for HD path to determine the account
-        if let Some(account_id) = find_account_for_transparent_address(wallet, unified_accounts, zcashd_address) {
+        if let Some(account_id) =
+            find_account_for_transparent_address(wallet, unified_accounts, zcashd_address)
+        {
             registry.register(addr_id, account_id);
         }
     }
@@ -520,7 +555,9 @@ pub fn initialize_address_registry(
         let addr_id = AddressId::Sapling(addr_str);
 
         // Find the account for this sapling address using its viewing key
-        if let Some(account_id) = find_account_for_sapling_address(wallet, unified_accounts, sapling_address, viewing_key) {
+        if let Some(account_id) =
+            find_account_for_sapling_address(wallet, unified_accounts, sapling_address, viewing_key)
+        {
             registry.register(addr_id, account_id);
         }
     }
