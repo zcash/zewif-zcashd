@@ -1,20 +1,20 @@
 use anyhow::Result;
 
-use zewif::sapling::{SaplingExtendedSpendingKey, SaplingIncomingViewingKey};
+use zewif::sapling::SaplingIncomingViewingKey;
 
 use super::super::super::KeyMetadata;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SaplingKey {
     ivk: SaplingIncomingViewingKey,
-    key: SaplingExtendedSpendingKey,
+    key: sapling::zip32::ExtendedSpendingKey,
     metadata: KeyMetadata,
 }
 
 impl SaplingKey {
     pub fn new(
         ivk: SaplingIncomingViewingKey,
-        key: SaplingExtendedSpendingKey,
+        key: sapling::zip32::ExtendedSpendingKey,
         metadata: KeyMetadata,
     ) -> Result<Self> {
         Ok(Self { ivk, key, metadata })
@@ -24,7 +24,7 @@ impl SaplingKey {
         &self.ivk
     }
 
-    pub fn key(&self) -> &SaplingExtendedSpendingKey {
+    pub fn key(&self) -> &sapling::zip32::ExtendedSpendingKey {
         &self.key
     }
 

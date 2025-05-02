@@ -1,7 +1,8 @@
 use anyhow::Result;
 
-use zewif::{Blob32, SecondsSinceEpoch};
-use zewif::{parse, parser::prelude::*};
+use zewif::Blob32;
+
+use crate::{parse, parser::prelude::*, zcashd::SecondsSinceEpoch};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MnemonicHDChain {

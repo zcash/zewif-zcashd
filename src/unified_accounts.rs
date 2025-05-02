@@ -1,21 +1,20 @@
 use std::collections::HashMap;
+use zcash_keys::keys::UnifiedFullViewingKey;
 
-use zewif::u256;
+use crate::{UfvkFingerprint, UnifiedAccountMetadata, UnifiedAddressMetadata};
 
-use super::{UnifiedAccountMetadata, UnifiedAddressMetadata};
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct UnifiedAccounts {
-    pub address_metadata: HashMap<u256, UnifiedAddressMetadata>,
-    pub full_viewing_keys: HashMap<u256, String>,
-    pub account_metadata: HashMap<u256, UnifiedAccountMetadata>,
+    pub address_metadata: Vec<UnifiedAddressMetadata>,
+    pub full_viewing_keys: HashMap<UfvkFingerprint, UnifiedFullViewingKey>,
+    pub account_metadata: HashMap<UfvkFingerprint, UnifiedAccountMetadata>,
 }
 
 impl UnifiedAccounts {
     pub fn new(
-        address_metadata: HashMap<u256, UnifiedAddressMetadata>,
-        full_viewing_keys: HashMap<u256, String>,
-        account_metadata: HashMap<u256, UnifiedAccountMetadata>,
+        address_metadata: Vec<UnifiedAddressMetadata>,
+        full_viewing_keys: HashMap<UfvkFingerprint, UnifiedFullViewingKey>,
+        account_metadata: HashMap<UfvkFingerprint, UnifiedAccountMetadata>,
     ) -> Self {
         Self {
             address_metadata,

@@ -1,7 +1,8 @@
 use anyhow::{Context, Result, bail};
 
-use zewif::{parse, parser::prelude::*};
-use zewif::{CompactSize, Data};
+use zewif::Data;
+
+use crate::{parse, parser::prelude::*, zcashd::CompactSize};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PubKey(Data);
@@ -30,7 +31,8 @@ impl Parse for PubKey {
         if size != 33 && size != 65 {
             bail!("Invalid PubKey size: {}", size);
         }
-        let key_data = Data::parse_len(p, size).context("PubKey")?;
+
+        let key_data = p.next(size).map(Data::from_slice).context("PubKey")?;
         Ok(Self(key_data))
     }
 }

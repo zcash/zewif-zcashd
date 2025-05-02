@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{SproutPaymentAddress, SproutSpendingKey};
+use crate::{SproutPaymentAddress, SproutSpendingKey};
 
 #[derive(Clone, PartialEq)]
 pub struct SproutKeys(HashMap<SproutPaymentAddress, SproutSpendingKey>);

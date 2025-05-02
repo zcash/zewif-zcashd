@@ -1,9 +1,8 @@
 use anyhow::Result;
 
-use zewif::{SproutWitness, u256};
-use zewif::{parse, parser::prelude::*};
+use crate::{parse, parser::prelude::*, zcashd::u256};
 
-use super::SproutPaymentAddress;
+use super::{SproutPaymentAddress, SproutWitness};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SproutNoteData {

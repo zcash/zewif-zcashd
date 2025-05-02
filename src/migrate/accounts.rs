@@ -1,21 +1,20 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::collections::{HashMap, HashSet};
-
 use zcash_primitives::consensus::NetworkType;
-use zewif::{Account, ProtocolAddress, TxId, u256};
+use zewif::{Account, ProtocolAddress, TxId, sapling::SaplingExtendedSpendingKey};
 
 use super::{
-    AddressId, AddressRegistry, keys::convert_sapling_spending_key, keys::find_sapling_key_for_ivk,
-    primitives::convert_network, transaction_addresses::extract_transaction_addresses,
+    AddressId, AddressRegistry, keys::find_sapling_key_for_ivk, primitives::convert_network,
+    transaction_addresses::extract_transaction_addresses,
 };
-use crate::ZcashdWallet;
+use crate::{UfvkFingerprint, ZcashdWallet};
 
 /// Convert ZCashd UnifiedAccounts to Zewif accounts
 pub fn convert_unified_accounts(
     wallet: &ZcashdWallet,
     unified_accounts: &crate::UnifiedAccounts,
     _transactions: &HashMap<TxId, zewif::Transaction>,
-) -> Result<HashMap<u256, Account>> {
+) -> Result<HashMap<UfvkFingerprint, Account>> {
     let mut accounts_map = HashMap::new();
 
     // Step 1: Create an account for each UnifiedAccountMetadata
@@ -24,19 +23,12 @@ pub fn convert_unified_accounts(
         let mut account = Account::new();
 
         // Set the account name and ZIP-32 account ID
-        let account_name = format!("Account #{}", account_metadata.account_id());
+        let account_name = format!("Account #{}", account_metadata.zip32_account_id());
         account.set_name(account_name);
-        account.set_zip32_account_id(account_metadata.account_id());
+        account.set_zip32_account_id(account_metadata.zip32_account_id());
 
         // Store the account in our map using the key_id as the key
         accounts_map.insert(*key_id, account);
-    }
-
-    // If no accounts were created, create a default account
-    if accounts_map.is_empty() {
-        let mut default_account = Account::new();
-        default_account.set_name("Default Account");
-        accounts_map.insert(u256::default(), default_account);
     }
 
     // Step 2: Build an AddressRegistry to track address-to-account mappings
@@ -49,20 +41,11 @@ pub fn convert_unified_accounts(
         // Create an AddressId for this transparent address
         let addr_id = AddressId::Transparent(zcashd_address.clone().into());
 
-        // Try to find which account this address belongs to using our registry
-        let account_key_id = if let Some(key_id) = address_registry.find_account(&addr_id) {
-            // Found a mapping in the registry
-            *key_id
-        } else {
-            // No mapping found, fall back to the first account
-            match accounts_map.keys().next() {
-                Some(key) => *key,
-                None => u256::default(),
-            }
-        };
-
-        if let Some(account) = accounts_map.get_mut(&account_key_id) {
-            let transparent_address = zewif::TransparentAddress::new(zcashd_address.clone());
+        if let Some(account) = address_registry
+            .find_account(&addr_id)
+            .and_then(|account_key_id| accounts_map.get_mut(account_key_id))
+        {
+            let transparent_address = zewif::transparent::Address::new(zcashd_address.clone());
 
             // Create a ZewifAddress from the TransparentAddress
             let protocol_address = ProtocolAddress::Transparent(transparent_address);
@@ -86,34 +69,25 @@ pub fn convert_unified_accounts(
         // Create an AddressId for this sapling address
         let addr_id = AddressId::Sapling(address_str.clone());
 
-        // Try to find which account this address belongs to using our registry
-        let account_key_id = if let Some(key_id) = address_registry.find_account(&addr_id) {
-            // Found a mapping in the registry
-            *key_id
-        } else {
-            // No mapping found, fall back to the first account
-            match accounts_map.keys().next() {
-                Some(key) => *key,
-                None => u256::default(),
-            }
-        };
-
-        if let Some(account) = accounts_map.get_mut(&account_key_id) {
+        if let Some(account) = address_registry
+            .find_account(&addr_id)
+            .and_then(|account_key_id| accounts_map.get_mut(account_key_id))
+        {
             let address_str = sapling_address.to_string(wallet.network());
 
-            // Create a new ShieldedAddress
-            let mut shielded_address = zewif::ShieldedAddress::new(address_str.clone());
+            // Create a new Sapling address
+            let mut shielded_address = zewif::sapling::Address::new(address_str.clone());
             shielded_address.set_incoming_viewing_key(viewing_key.to_owned());
 
             // Add spending key if available in sapling_keys
             if let Some(sapling_key) = find_sapling_key_for_ivk(wallet, viewing_key) {
                 // Convert to Zewif spending key format
-                let spending_key = convert_sapling_spending_key(sapling_key.key())
-                    .context("Failed to convert sapling spending key")?;
-                shielded_address.set_spending_key(spending_key);
+                shielded_address.set_spending_key(SaplingExtendedSpendingKey::new(
+                    sapling_key.key().to_bytes(),
+                ));
             }
 
-            let protocol_address = zewif::ProtocolAddress::Shielded(shielded_address);
+            let protocol_address = zewif::ProtocolAddress::Sapling(Box::new(shielded_address));
             let mut zewif_address = zewif::Address::new(protocol_address);
 
             // Set purpose if available - convert to Address type for lookup
@@ -124,6 +98,7 @@ pub fn convert_unified_accounts(
 
             // Add the address to the account
             account.add_address(zewif_address);
+        } else {
         }
     }
 
@@ -195,9 +170,7 @@ pub fn convert_unified_accounts(
                 // First pass: Look for explicit account mappings from standard addresses
                 for address_str in &tx_addresses {
                     // Check for standard addresses that we can convert to AddressId
-                    if let Ok(addr_id) =
-                        AddressId::from_address_string(address_str, wallet.network())
-                    {
+                    if let Ok(addr_id) = AddressId::from_address_string(address_str) {
                         // Look up the account in our registry
                         if let Some(account_id) = address_registry.find_account(&addr_id) {
                             relevant_accounts.insert(*account_id);
@@ -215,9 +188,7 @@ pub fn convert_unified_accounts(
                         {
                             // This is a spending address - may indicate source account
                             let pure_addr = &address_str[(address_str.find(':').unwrap() + 1)..];
-                            if let Ok(addr_id) =
-                                AddressId::from_address_string(pure_addr, wallet.network())
-                            {
+                            if let Ok(addr_id) = AddressId::from_address_string(pure_addr) {
                                 if let Some(account_id) = address_registry.find_account(&addr_id) {
                                     relevant_accounts.insert(*account_id);
                                 }
@@ -228,9 +199,7 @@ pub fn convert_unified_accounts(
                         {
                             // This is a receiving address
                             let pure_addr = &address_str[(address_str.find(':').unwrap() + 1)..];
-                            if let Ok(addr_id) =
-                                AddressId::from_address_string(pure_addr, wallet.network())
-                            {
+                            if let Ok(addr_id) = AddressId::from_address_string(pure_addr) {
                                 if let Some(account_id) = address_registry.find_account(&addr_id) {
                                     relevant_accounts.insert(*account_id);
                                 }
@@ -241,9 +210,7 @@ pub fn convert_unified_accounts(
                         {
                             // This is a change address - try to find its account
                             let pure_addr = &address_str[(address_str.find(':').unwrap() + 1)..];
-                            if let Ok(addr_id) =
-                                AddressId::from_address_string(pure_addr, wallet.network())
-                            {
+                            if let Ok(addr_id) = AddressId::from_address_string(pure_addr) {
                                 if let Some(account_id) = address_registry.find_account(&addr_id) {
                                     // For change, we add ONLY the source account
                                     relevant_accounts.clear();
@@ -333,7 +300,7 @@ fn find_source_account_for_transaction(
     wallet_tx: &crate::WalletTx,
     addresses: &HashSet<String>,
     address_registry: &AddressRegistry,
-) -> Option<u256> {
+) -> Option<UfvkFingerprint> {
     // Network for parsing addresses - use mainnet as default
     let network = convert_network(NetworkType::Main); // WalletTx doesn't expose network directly
 
@@ -348,7 +315,7 @@ fn find_source_account_for_transaction(
                 let pure_addr = &address_str[(address_str.find(':').unwrap() + 1)..];
 
                 // Try to convert to AddressId and find its account
-                if let Ok(addr_id) = AddressId::from_address_string(pure_addr, network) {
+                if let Ok(addr_id) = AddressId::from_address_string(pure_addr) {
                     if let Some(account_id) = address_registry.find_account(&addr_id) {
                         return Some(*account_id);
                     }
@@ -362,7 +329,7 @@ fn find_source_account_for_transaction(
             {
                 let pure_addr = &address_str[(address_str.find(':').unwrap() + 1)..];
 
-                if let Ok(addr_id) = AddressId::from_address_string(pure_addr, network) {
+                if let Ok(addr_id) = AddressId::from_address_string(pure_addr) {
                     if let Some(account_id) = address_registry.find_account(&addr_id) {
                         return Some(*account_id);
                     }
@@ -375,7 +342,9 @@ fn find_source_account_for_transaction(
 }
 
 /// Find the default account ID from a list of accounts
-fn find_default_account_id(accounts_map: &HashMap<u256, Account>) -> Option<u256> {
+fn find_default_account_id(
+    accounts_map: &HashMap<UfvkFingerprint, Account>,
+) -> Option<UfvkFingerprint> {
     // First look for an account named "Default Account"
     for (id, account) in accounts_map {
         if account.name() == "Default Account" {
@@ -399,7 +368,7 @@ fn find_account_for_transparent_address(
     wallet: &ZcashdWallet,
     unified_accounts: &crate::UnifiedAccounts,
     address: &crate::Address,
-) -> Option<u256> {
+) -> Option<UfvkFingerprint> {
     // First, check if this is a transparent receiver in a unified address
     // This requires looking up the pub key for this address and finding matching key metadata
 
@@ -447,25 +416,25 @@ fn find_account_for_sapling_address(
     unified_accounts: &crate::UnifiedAccounts,
     _address: &crate::SaplingZPaymentAddress,
     viewing_key: &zewif::sapling::SaplingIncomingViewingKey,
-) -> Option<u256> {
+) -> Option<UfvkFingerprint> {
     // Look up the full viewing key associated with this incoming viewing key
-    if wallet.sapling_keys().get(viewing_key).is_some() {
-        // SaplingKey doesn't directly expose metadata or extfvk
-        // Instead, we'll rely on viewing key mappings in unified accounts
 
-        // Check full viewing keys mapping in unified accounts
-        // Rather than trying to get the FVK string, we'll use the viewing key we already have
-        let ivk_str = viewing_key.to_string();
-        for (key_id, viewing_key_str) in &unified_accounts.full_viewing_keys {
-            // In a real implementation, we'd properly check if this IVK is derived from FVK
-            // For now, we'll just check if the strings have some similarity
-            if viewing_key_str.contains(&ivk_str) || ivk_str.contains(viewing_key_str) {
-                return Some(*key_id);
-            }
-        }
-    }
-
-    None
+    //    if wallet.sapling_keys().get(viewing_key).is_some() {
+    //        // SaplingKey doesn't directly expose metadata or extfvk
+    //        // Instead, we'll rely on viewing key mappings in unified accounts
+    //
+    //        // Check full viewing keys mapping in unified accounts
+    //        // Rather than trying to get the FVK string, we'll use the viewing key we already have
+    //        let ivk_str = viewing_key.to_string();
+    //        for (key_id, viewing_key_str) in &unified_accounts.full_viewing_keys {
+    //            // In a real implementation, we'd properly check if this IVK is derived from FVK
+    //            // For now, we'll just check if the strings have some similarity
+    //            if viewing_key_str.contains(&ivk_str) || ivk_str.contains(viewing_key_str) {
+    //                return Some(*key_id);
+    //            }
+    //        }
+    //    }
+    todo!()
 }
 
 /// Check if a key path follows the unified account pattern
@@ -493,9 +462,9 @@ fn extract_account_id_from_keypath(keypath: &str) -> Option<u32> {
 fn find_account_key_id_by_account_id(
     unified_accounts: &crate::UnifiedAccounts,
     account_id: u32,
-) -> Option<u256> {
+) -> Option<UfvkFingerprint> {
     for (key_id, account_metadata) in &unified_accounts.account_metadata {
-        if account_metadata.account_id() == account_id {
+        if account_metadata.zip32_account_id() == account_id {
             return Some(*key_id);
         }
     }
@@ -506,11 +475,11 @@ fn find_account_key_id_by_account_id(
 fn find_account_key_id_by_seed_fingerprint(
     unified_accounts: &crate::UnifiedAccounts,
     seed_fp: &zewif::Blob32,
-) -> Option<u256> {
+) -> Option<UfvkFingerprint> {
     let seed_fp_hex = hex::encode(seed_fp.as_ref());
     for (key_id, account_metadata) in &unified_accounts.account_metadata {
         // Convert the account's seed fingerprint to hex and compare
-        let account_seed_fp_hex = format!("{}", account_metadata.seed_fingerprint());
+        let account_seed_fp_hex = format!("{}", account_metadata.seed_fingerprint().to_hex());
         if account_seed_fp_hex == seed_fp_hex {
             return Some(*key_id);
         }
@@ -526,9 +495,9 @@ pub fn initialize_address_registry(
     let mut registry = AddressRegistry::new();
 
     // Step 1: Map the unified account addresses to their accounts
-    for (address_id, address_metadata) in &unified_accounts.address_metadata {
+    for address_metadata in &unified_accounts.address_metadata {
         // Create an AddressId for this unified account address
-        let addr_id = AddressId::from_unified_account_id(*address_id);
+        let addr_id = AddressId::from_unified_address_metadata(address_metadata);
 
         // Register this address with its account's key_id
         registry.register(addr_id, address_metadata.key_id);

@@ -1,9 +1,11 @@
 use anyhow::Result;
 
-use zewif::{Blob32, NoQuotesDebugOption, SecondsSinceEpoch};
-use zewif::{parse, parser::prelude::*};
+use zewif::{Blob32, NoQuotesDebugOption};
+
+use crate::{parse, parser::prelude::*, zcashd::SecondsSinceEpoch};
 
 const VERSION_WITH_HDDATA: i32 = 10;
+
 #[derive(Clone, PartialEq)]
 pub struct KeyMetadata {
     version: i32,
@@ -60,6 +62,11 @@ impl Parse for KeyMetadata {
             hd_keypath = None;
             seed_fp = None;
         }
-        Ok(Self { version, create_time, hd_keypath, seed_fp })
+        Ok(Self {
+            version,
+            create_time,
+            hd_keypath,
+            seed_fp,
+        })
     }
 }

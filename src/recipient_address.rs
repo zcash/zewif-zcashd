@@ -1,7 +1,9 @@
 use anyhow::Result;
 
-use zewif::{parse, parser::prelude::*, ReceiverType};
-use super::{KeyId, OrchardRawAddress, SaplingZPaymentAddress, ScriptId};
+use crate::{
+    KeyId, OrchardRawAddress, SaplingZPaymentAddress, ScriptId, parse, parser::prelude::*,
+    zcashd::ReceiverType,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RecipientAddress {

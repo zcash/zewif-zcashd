@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{Key, PubKey};
+use crate::{Key, PubKey};
 
 #[derive(Clone, PartialEq)]
 pub struct Keys(HashMap<PubKey, Key>);

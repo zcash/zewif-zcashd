@@ -1,4 +1,4 @@
-use zewif::u252;
+use crate::zcashd::u252;
 
 use super::KeyMetadata;
 

@@ -1,37 +1,22 @@
-use std::collections::HashMap;
-
 use anyhow::Result;
+use std::collections::HashMap;
+use zcash_primitives::transaction::Transaction;
+use zewif::{BlockHash, Data};
 
-use zewif::{parse, parser::prelude::*};
-
-use super::{OrchardTxMeta, SaplingBundleV5, ZIP225_TX_VERSION};
-
-use zewif::{BranchId, CompactSize, Data, ExpiryHeight, u256};
-
-use super::{
-    JSOutPoint, JoinSplits, LockTime, OrchardBundle, SAPLING_TX_VERSION, SaplingBundle,
-    SaplingBundleV4, SaplingNoteData, SaplingOutPoint, SproutNoteData, TxIn, TxOut, TxVersion,
+use super::{JSOutPoint, OrchardTxMeta, SaplingNoteData, SaplingOutPoint, SproutNoteData};
+use crate::{
+    parse,
+    parser::prelude::*,
+    zcashd::{CompactSize, u256},
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct WalletTx {
     // CTransaction
-    version: TxVersion,
-
-    consensus_branch_id: Option<BranchId>,
-
-    vin: Vec<TxIn>,
-    vout: Vec<TxOut>,
-    lock_time: Option<LockTime>,
-    expiry_height: Option<ExpiryHeight>,
-    sapling_bundle: SaplingBundle,
-
-    orchard_bundle: OrchardBundle,
-
-    join_splits: Option<JoinSplits>,
+    transaction: Transaction,
 
     // CMerkleTx
-    hash_block: u256,
+    hash_block: BlockHash,
     merkle_branch: Vec<u256>,
     index: i32,
 
@@ -50,43 +35,11 @@ pub struct WalletTx {
 }
 
 impl WalletTx {
-    pub fn version(&self) -> TxVersion {
-        self.version
+    pub fn transaction(&self) -> &Transaction {
+        &self.transaction
     }
 
-    pub fn consensus_branch_id(&self) -> Option<BranchId> {
-        self.consensus_branch_id
-    }
-
-    pub fn vin(&self) -> &[TxIn] {
-        &self.vin
-    }
-
-    pub fn vout(&self) -> &[TxOut] {
-        &self.vout
-    }
-
-    pub fn lock_time(&self) -> Option<LockTime> {
-        self.lock_time
-    }
-
-    pub fn expiry_height(&self) -> Option<ExpiryHeight> {
-        self.expiry_height
-    }
-
-    pub fn sapling_bundle(&self) -> &SaplingBundle {
-        &self.sapling_bundle
-    }
-
-    pub fn orchard_bundle(&self) -> &OrchardBundle {
-        &self.orchard_bundle
-    }
-
-    pub fn join_splits(&self) -> Option<&JoinSplits> {
-        self.join_splits.as_ref()
-    }
-
-    pub fn hash_block(&self) -> u256 {
+    pub fn hash_block(&self) -> BlockHash {
         self.hash_block
     }
 
@@ -139,57 +92,32 @@ impl WalletTx {
     }
 }
 
+struct ParseTransaction(zcash_primitives::transaction::Transaction);
+impl Parse for ParseTransaction {
+    fn parse(p: &mut Parser) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        Ok(ParseTransaction(
+            zcash_primitives::transaction::Transaction::read(
+                p,
+                // The consensus branch ID that we use here will be ignored; it does not direct and is
+                // not used by us after parsing; transaction serialization for v4 and below
+                // transactions do not encode it and v5 transaction parsing ignores it entirely,
+                // so it is essentially ephemeral as this parsing is only performed so that we can
+                // reencode the transaction without the remainder of the `CMerkleTx` and `CWalletTx`
+                // data.
+                zcash_primitives::consensus::BranchId::Nu5,
+            )?,
+        ))
+    }
+}
+
 impl Parse for WalletTx {
     fn parse(p: &mut Parser) -> Result<Self> {
         // CTransaction
 
-        let version: TxVersion = parse!(p, "version")?;
-
-        let vin;
-        let vout;
-        let lock_time;
-        let mut expiry_height = None;
-        let sapling_bundle: SaplingBundle;
-        let mut join_splits = None;
-        let mut consensus_branch_id = None;
-        let mut orchard_bundle = OrchardBundle::default();
-
-        if version.is_zip225() {
-            consensus_branch_id = Some(parse!(p, BranchId, "consensus_branch_id")?);
-            lock_time = parse!(p, LockTime, "lock_time")?.as_option();
-            expiry_height = parse!(p, ExpiryHeight, "expiry_height")?.as_option();
-            vin = parse!(p, "vin")?;
-            vout = parse!(p, "vout")?;
-            let sapling_bundle_v5: SaplingBundleV5 = parse!(p, "sapling_bundle")?;
-            sapling_bundle = SaplingBundle::V5(sapling_bundle_v5);
-
-            orchard_bundle = parse!(p, "orchard_bundle")?;
-        } else {
-            vin = parse!(p, "vin")?;
-            vout = parse!(p, "vout")?;
-            lock_time = parse!(p, LockTime, "lock_time")?.as_option();
-            if version.is_overwinter() || version.is_sapling() || version.is_future() {
-                expiry_height = parse!(p, ExpiryHeight, "expiry_height")?.as_option();
-            }
-
-            let mut sapling_bundle_v4: SaplingBundleV4 = (version.is_sapling()
-                || version.is_future())
-            .then(|| parse!(p, "sapling_bundle"))
-            .transpose()?
-            .unwrap_or_default();
-
-            if version.number() >= 2 {
-                let use_groth = version.is_overwinter() && version.number() >= SAPLING_TX_VERSION;
-                join_splits = Some(parse!(p, param = use_groth, "join_splits")?);
-            }
-
-            if (version.is_sapling() || version.is_future()) && sapling_bundle_v4.have_actions() {
-                let binding_sig = parse!(p, "binding_sig")?;
-                sapling_bundle_v4.set_binding_sig(binding_sig);
-            }
-
-            sapling_bundle = SaplingBundle::V4(sapling_bundle_v4);
-        }
+        let ParseTransaction(transaction) = parse!(p, ParseTransaction, "wallet_transaction")?;
 
         // CMerkleTx
         let hash_block = parse!(p, "hash_block")?;
@@ -212,12 +140,12 @@ impl Parse for WalletTx {
         let is_spent = parse!(p, "is_spent")?;
 
         let mut sapling_note_data = None;
-        if version.is_overwinter() && version.number() >= SAPLING_TX_VERSION {
+        if transaction.version().has_sapling() {
             sapling_note_data = parse!(p, "sapling_note_data")?;
         }
 
         let mut orchard_tx_meta: Option<OrchardTxMeta> = None;
-        if version.is_overwinter() && version.number() >= ZIP225_TX_VERSION {
+        if transaction.version().has_orchard() {
             let meta = parse!(p, "orchard_tx_meta")?;
             orchard_tx_meta = Some(meta);
         }
@@ -233,15 +161,7 @@ impl Parse for WalletTx {
 
         Ok(Self {
             // CTransaction
-            version,
-            consensus_branch_id,
-            vin,
-            vout,
-            lock_time,
-            expiry_height,
-            sapling_bundle,
-            orchard_bundle,
-            join_splits,
+            transaction,
 
             // CMerkleTx
             hash_block,

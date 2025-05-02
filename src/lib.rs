@@ -26,4 +26,6 @@ mod_use!(zcashd_dump);
 mod_use!(zcashd_parser);
 mod_use!(zcashd_wallet);
 
-pub(crate) mod migrate;
+pub mod migrate;
+pub mod parser;
+pub mod zcashd;

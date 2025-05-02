@@ -1,9 +1,8 @@
 use anyhow::Result;
-
 use zcash_address::{ToAddress, ZcashAddress, unified::Encoding};
-
 use zewif::{Blob, Blob32, Network};
-use zewif::{parse, parser::prelude::*};
+
+use crate::{parse, parser::prelude::*};
 
 use crate::migrate::primitives::address_network_from_zewif;
 

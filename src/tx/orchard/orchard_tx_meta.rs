@@ -1,11 +1,8 @@
-use std::collections::HashMap;
-
 use anyhow::Result;
-
+use std::collections::HashMap;
 use zewif::Blob64;
-use zewif::{parse, parser::prelude::*};
 
-use super::super::super::ClientVersion;
+use crate::{ClientVersion, parse, parser::prelude::*};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrchardTxMeta {

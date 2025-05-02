@@ -1,7 +1,7 @@
 use anyhow::Result;
-
 use zewif::TxId;
-use zewif::{parse, parser::prelude::*};
+
+use crate::{parse, parser::prelude::*};
 
 pub type SaplingOutPoint = OutPoint;
 
@@ -23,6 +23,9 @@ impl OutPoint {
 
 impl Parse for OutPoint {
     fn parse(p: &mut Parser) -> Result<Self> {
-        Ok(Self { txid: parse!(p, "txid")?, vout: parse!(p, "vout")? })
+        Ok(Self {
+            txid: parse!(p, "txid")?,
+            vout: parse!(p, "vout")?,
+        })
     }
 }

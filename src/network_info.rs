@@ -1,7 +1,7 @@
 use anyhow::Result;
-
-use zewif::{parse, parser::prelude::*};
 use zewif::Network;
+
+use crate::{parse, parser::prelude::*};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct NetworkInfo {
@@ -14,12 +14,18 @@ impl NetworkInfo {
         &self.zcash
     }
 
-    pub fn identifier(&self) -> String {
-        self.network.into()
-    }
-
     pub fn network(&self) -> Network {
         self.network
+    }
+
+    pub fn to_address_encoding_network(&self) -> zcash_protocol::consensus::Network {
+        use zcash_protocol::consensus::Network::*;
+        match self.network {
+            Network::Main => MainNetwork,
+            Network::Test => TestNetwork,
+            // Regtest addresses are encoded as for the test network.
+            Network::Regtest => TestNetwork,
+        }
     }
 }
 
