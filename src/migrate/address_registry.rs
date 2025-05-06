@@ -15,7 +15,7 @@ use crate::{UfvkFingerprint, UnifiedAddressMetadata};
 bitflags! {
     /// A set of flags describing the type(s) of outputs that a Zcash address can receive.
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-    pub(crate) struct ReceiverFlags: i64 {
+    pub struct ReceiverFlags: i64 {
         /// The address did not contain any recognized receiver types.
         const UNKNOWN = 0b00000000;
         /// The associated address can receive transparent p2pkh outputs.
