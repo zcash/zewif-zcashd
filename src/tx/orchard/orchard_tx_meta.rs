@@ -1,13 +1,13 @@
 use anyhow::Result;
+use orchard::keys::IncomingViewingKey;
 use std::collections::HashMap;
-use zewif::Blob64;
 
 use crate::{ClientVersion, parse, parser::prelude::*};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrchardTxMeta {
     version: ClientVersion,
-    action_data: HashMap<u32, Blob64>,
+    receiving_keys: HashMap<u32, IncomingViewingKey>,
     actions_spending_my_nodes: Vec<u32>,
 }
 
@@ -17,14 +17,14 @@ impl OrchardTxMeta {
         self.version
     }
 
-    /// Returns action data for the given index
-    pub fn action_data(&self, index: u32) -> Option<&Blob64> {
-        self.action_data.get(&index)
+    /// Returns the IVK that received the output at the given action index, if any.
+    pub fn receiving_key(&self, index: u32) -> Option<&IncomingViewingKey> {
+        self.receiving_keys.get(&index)
     }
 
     /// Returns the entire action data map
-    pub fn all_action_data(&self) -> &HashMap<u32, Blob64> {
-        &self.action_data
+    pub fn receiving_keys(&self) -> &HashMap<u32, IncomingViewingKey> {
+        &self.receiving_keys
     }
 
     /// Returns the list of actions spending nodes owned by this wallet
@@ -40,7 +40,7 @@ impl Parse for OrchardTxMeta {
     {
         Ok(Self {
             version: parse!(parser, "version")?,
-            action_data: parse!(parser, "action_data")?,
+            receiving_keys: parse!(parser, "receiving_keys")?,
             actions_spending_my_nodes: parse!(parser, "actions_spending_my_nodes")?,
         })
     }

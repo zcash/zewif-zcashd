@@ -29,7 +29,7 @@ pub struct ZcashdWallet {
     send_recipients: HashMap<TxId, Vec<RecipientMapping>>,
     sprout_keys: Option<SproutKeys>,
     transactions: HashMap<TxId, WalletTx>,
-    unified_accounts: Option<UnifiedAccounts>,
+    unified_accounts: UnifiedAccounts,
     witnesscachesize: i64,
 }
 
@@ -55,7 +55,7 @@ impl ZcashdWallet {
         send_recipients: HashMap<TxId, Vec<RecipientMapping>>,
         sprout_keys: Option<SproutKeys>,
         transactions: HashMap<TxId, WalletTx>,
-        unified_accounts: Option<UnifiedAccounts>,
+        unified_accounts: UnifiedAccounts,
         witnesscachesize: i64,
     ) -> Self {
         ZcashdWallet {
@@ -160,8 +160,8 @@ impl ZcashdWallet {
         &self.transactions
     }
 
-    pub fn unified_accounts(&self) -> Option<&UnifiedAccounts> {
-        self.unified_accounts.as_ref()
+    pub fn unified_accounts(&self) -> &UnifiedAccounts {
+        &self.unified_accounts
     }
 
     pub fn witnesscachesize(&self) -> i64 {

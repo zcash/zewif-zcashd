@@ -11,6 +11,14 @@ pub struct UnifiedAccounts {
 }
 
 impl UnifiedAccounts {
+    pub fn none() -> Self {
+        Self {
+            address_metadata: vec![],
+            full_viewing_keys: HashMap::new(),
+            account_metadata: HashMap::new(),
+        }
+    }
+
     pub fn new(
         address_metadata: Vec<UnifiedAddressMetadata>,
         full_viewing_keys: HashMap<UfvkFingerprint, UnifiedFullViewingKey>,

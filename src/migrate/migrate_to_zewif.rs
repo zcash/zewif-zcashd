@@ -33,8 +33,10 @@ pub fn migrate_to_zewif(wallet: &ZcashdWallet) -> Result<Zewif> {
     // For each of our received transactions, record the most stable witness.
     set_received_output_witnesses(wallet, &mut transactions)?;
 
-    // If there are unified accounts, process them
-    if let Some(unified_accounts) = wallet.unified_accounts() {
+    // Add an account to the wallet for each unified account
+    let mut accounts_map = {
+        let unified_accounts = wallet.unified_accounts();
+
         // Create accounts based on unified_accounts structure
         let mut accounts_map = convert_unified_accounts(wallet, unified_accounts, &transactions)?;
 
@@ -46,31 +48,33 @@ pub fn migrate_to_zewif(wallet: &ZcashdWallet) -> Result<Zewif> {
         default_account.set_name("Default Account");
 
         // Create a mutable reference for accounts_map to use in the conversion functions
-        let mut accounts_map_ref = Some(&mut accounts_map);
+        {
+            let mut accounts_map_ref = Some(&mut accounts_map);
 
-        // Convert transparent addresses using the registry to assign to correct accounts
-        convert_transparent_addresses(
-            wallet,
-            &mut default_account,
-            Some(&address_registry),
-            &mut accounts_map_ref,
-        )?;
+            // Convert transparent addresses using the registry to assign to correct accounts
+            convert_transparent_addresses(
+                wallet,
+                &mut default_account,
+                Some(&address_registry),
+                &mut accounts_map_ref,
+            )?;
 
-        // Convert sapling addresses using the registry to assign to correct accounts
-        convert_sapling_addresses(
-            wallet,
-            &mut default_account,
-            Some(&address_registry),
-            &mut accounts_map_ref,
-        )?;
+            // Convert sapling addresses using the registry to assign to correct accounts
+            convert_sapling_addresses(
+                wallet,
+                &mut default_account,
+                Some(&address_registry),
+                &mut accounts_map_ref,
+            )?;
 
-        // Convert unified addresses using the registry to assign to correct accounts
-        convert_unified_addresses(
-            wallet,
-            &mut default_account,
-            Some(&address_registry),
-            &mut accounts_map_ref,
-        )?;
+            // Convert unified addresses using the registry to assign to correct accounts
+            convert_unified_addresses(
+                wallet,
+                &mut default_account,
+                Some(&address_registry),
+                &mut accounts_map_ref,
+            )?;
+        }
 
         // Add the default account to accounts_map if it has any addresses
         if !default_account.addresses().is_empty() {
@@ -79,17 +83,23 @@ pub fn migrate_to_zewif(wallet: &ZcashdWallet) -> Result<Zewif> {
             accounts_map.insert(UfvkFingerprint::new([0u8; 32]), default_account);
         }
 
-        // Add all accounts to the wallet
+        accounts_map
+    };
+
+    // Add an account to the wallet for each legacy pool of funds.
+    {
+        // FIXME: Add the legacy account and any other accounts (legacy Sapling keys allocated via
+        // `z_getnewaddress`, imported transparent accounts, etc.)
         for account in accounts_map.values() {
             zewif_wallet.add_account(account.clone());
         }
-    } else {
+
         // No unified accounts - create a single default account
         let mut default_account = Account::new();
         default_account.set_name("Default Account");
 
         // Create a None reference for accounts_map
-        let mut accounts_map_ref = None;
+        let mut accounts_map_ref = Some(&mut accounts_map);
 
         // Convert transparent addresses (single account mode)
         convert_transparent_addresses(wallet, &mut default_account, None, &mut accounts_map_ref)?;

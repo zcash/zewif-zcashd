@@ -261,7 +261,7 @@ pub fn extract_transaction_addresses(
 
     // Improved Orchard action processing
     if let Some(orchard_bundle) = tx.transaction().orchard_bundle() {
-        for (idx, action) in orchard_bundle.actions().into_iter().enumerate() {
+        for (idx, action) in (0u32..).zip(orchard_bundle.actions().into_iter()) {
             let nullifier_hex = hex::encode(action.nullifier().to_bytes());
             addresses.insert(format!("orchard_nullifier:{}", nullifier_hex));
 
@@ -271,7 +271,7 @@ pub fn extract_transaction_addresses(
 
             // Extract additional metadata if available
             if let Some(orchard_meta) = tx.orchard_tx_meta() {
-                if let Some(action_data) = orchard_meta.action_data(idx as u32) {
+                if let Some(ivk) = orchard_meta.receiving_key(idx) {
                     // Track action by index
                     addresses.insert(format!("orchard_action:{}:{}", tx_id, idx));
 
@@ -279,7 +279,7 @@ pub fn extract_transaction_addresses(
                     // Action data typically contains commitment and value information
                     addresses.insert(format!(
                         "orchard_action_data:{}",
-                        hex::encode(action_data.as_ref() as &[u8])
+                        hex::encode(&ivk.to_bytes()[..])
                     ));
 
                     // If we have recipient data from the transaction, link it

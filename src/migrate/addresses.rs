@@ -147,12 +147,10 @@ pub fn convert_unified_addresses(
     accounts_map: &mut Option<&mut HashMap<UfvkFingerprint, Account>>,
 ) -> Result<()> {
     // Only process if we have unified accounts
-    let unified_accounts = match wallet.unified_accounts() {
-        Some(ua) => ua,
-        None => return Ok(()),
-    };
+    let unified_accounts = wallet.unified_accounts();
 
     // Multi-account mode is active when we have both a registry and accounts map
+    // TODO: figure out why this is being checked
     let multi_account_mode = address_registry.is_some() && accounts_map.is_some();
 
     // Process unified address metadata entries

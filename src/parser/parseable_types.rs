@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::{Context, Result, anyhow, bail};
 use zcash_keys::keys::UnifiedFullViewingKey;
-use zewif::{Data, SeedFingerprint, sapling::SaplingIncomingViewingKey};
+use zewif::{Blob, Data, SeedFingerprint, sapling::SaplingIncomingViewingKey};
 
 use crate::{
     parse,
@@ -445,5 +445,14 @@ impl Parse for UnifiedFullViewingKey {
         let ufvk_str: String = parse!(p, "ufvk string")?;
         let (_, ufvk) = zcash_address::unified::Ufvk::decode(&ufvk_str)?;
         Ok(Self::parse(&ufvk)?)
+    }
+}
+
+impl Parse for orchard::keys::IncomingViewingKey {
+    fn parse(p: &mut Parser) -> Result<Self> {
+        let bytes: Blob<64> = parse!(p, "orchard IVK")?;
+        orchard::keys::IncomingViewingKey::from_bytes(bytes.as_bytes())
+            .into_option()
+            .ok_or(anyhow::anyhow!("Not a valid Orchard incoming viewing key"))
     }
 }

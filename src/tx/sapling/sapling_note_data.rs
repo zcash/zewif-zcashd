@@ -1,6 +1,5 @@
 use anyhow::Result;
 use zewif::{Blob, sapling::SaplingIncomingViewingKey};
-
 use crate::{parse, parser::prelude::*, zcashd::IncrementalWitness};
 
 pub type SaplingWitness = IncrementalWitness<32, Blob<32>>;

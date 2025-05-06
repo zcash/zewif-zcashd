@@ -366,9 +366,9 @@ impl<'a> ZcashdParser<'a> {
         Ok(send_recipients)
     }
 
-    fn parse_unified_accounts(&self) -> Result<Option<UnifiedAccounts>> {
+    fn parse_unified_accounts(&self) -> Result<UnifiedAccounts> {
         if !self.dump.has_keys_for_keyname("unifiedaddrmeta") {
-            return Ok(None);
+            return Ok(UnifiedAccounts::none());
         }
         let address_metadata_records = self.dump.records_for_keyname("unifiedaddrmeta")?;
         let mut address_metadata = vec![];
@@ -419,11 +419,11 @@ impl<'a> ZcashdParser<'a> {
             self.mark_key_parsed(&key);
         }
 
-        Ok(Some(UnifiedAccounts::new(
+        Ok(UnifiedAccounts::new(
             address_metadata,
             full_viewing_keys,
             account_metadata,
-        )))
+        ))
     }
 
     fn parse_mnemonic_phrase(&self) -> Result<Bip39Mnemonic> {
