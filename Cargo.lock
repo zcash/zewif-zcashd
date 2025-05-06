@@ -2769,7 +2769,7 @@ dependencies = [
 [[package]]
 name = "zewif"
 version = "0.1.0"
-source = "git+https://github.com/BlockchainCommons/zewif.git?rev=c9efe80207ee0462cca3d617ce20a33052270610#c9efe80207ee0462cca3d617ce20a33052270610"
+source = "git+https://github.com/BlockchainCommons/zewif.git?rev=18592063cce454158e8110d0bd11be869fb67f60#18592063cce454158e8110d0bd11be869fb67f60"
 dependencies = [
  "anyhow",
  "bc-components",

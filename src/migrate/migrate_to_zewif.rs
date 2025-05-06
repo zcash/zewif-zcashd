@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::{UfvkFingerprint, ZcashdWallet};
 
-use zewif::{self, Account, TxId, Zewif, ZewifWallet};
+use zewif::{self, Account, BlockHeight, TxId, Zewif, ZewifWallet};
 
 use super::{
     convert_sapling_addresses, convert_seed_material, convert_transactions,
@@ -13,9 +13,9 @@ use super::{
 };
 
 /// Migrate a ZCashd wallet to the Zewif wallet format
-pub fn migrate_to_zewif(wallet: &ZcashdWallet) -> Result<Zewif> {
+pub fn migrate_to_zewif(wallet: &ZcashdWallet, export_height: BlockHeight) -> Result<Zewif> {
     // Create a new Zewif
-    let mut zewif = Zewif::new();
+    let mut zewif = Zewif::new(export_height);
 
     // Convert seed material (mnemonic phrase)
     let seed_material = convert_seed_material(wallet)?;
