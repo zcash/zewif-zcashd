@@ -7,12 +7,17 @@ use super::{
     AddressId, AddressRegistry, keys::find_sapling_key_for_ivk, primitives::convert_network,
     transaction_addresses::extract_transaction_addresses,
 };
-use crate::{UfvkFingerprint, ZcashdWallet};
+use crate::{
+    ZcashdWallet,
+    zcashd_wallet::{
+        Address, UfvkFingerprint, UnifiedAccounts, WalletTx, sapling::SaplingZPaymentAddress,
+    },
+};
 
 /// Convert ZCashd UnifiedAccounts to Zewif accounts
 pub fn convert_unified_accounts(
     wallet: &ZcashdWallet,
-    unified_accounts: &crate::UnifiedAccounts,
+    unified_accounts: &UnifiedAccounts,
     _transactions: &HashMap<TxId, zewif::Transaction>,
 ) -> Result<HashMap<UfvkFingerprint, Account>> {
     let mut accounts_map = HashMap::new();
@@ -91,7 +96,7 @@ pub fn convert_unified_accounts(
             let mut zewif_address = zewif::Address::new(protocol_address);
 
             // Set purpose if available - convert to Address type for lookup
-            let zcashd_address = crate::Address::from(address_str);
+            let zcashd_address = Address::from(address_str);
             if let Some(purpose) = wallet.address_purposes().get(&zcashd_address) {
                 zewif_address.set_purpose(purpose.clone());
             }
@@ -297,7 +302,7 @@ pub fn convert_unified_accounts(
 
 /// Find the source account for a transaction based on transaction data and extracted addresses
 fn find_source_account_for_transaction(
-    wallet_tx: &crate::WalletTx,
+    wallet_tx: &WalletTx,
     addresses: &HashSet<String>,
     address_registry: &AddressRegistry,
 ) -> Option<UfvkFingerprint> {
@@ -366,8 +371,8 @@ fn find_default_account_id(
 /// Find the account ID for a transparent address by looking at key metadata and relationships
 fn find_account_for_transparent_address(
     wallet: &ZcashdWallet,
-    unified_accounts: &crate::UnifiedAccounts,
-    address: &crate::Address,
+    unified_accounts: &UnifiedAccounts,
+    address: &Address,
 ) -> Option<UfvkFingerprint> {
     // First, check if this is a transparent receiver in a unified address
     // This requires looking up the pub key for this address and finding matching key metadata
@@ -413,8 +418,8 @@ fn find_account_for_transparent_address(
 /// Find the account ID for a sapling address by looking at the viewing key relationships
 fn find_account_for_sapling_address(
     wallet: &ZcashdWallet,
-    unified_accounts: &crate::UnifiedAccounts,
-    _address: &crate::SaplingZPaymentAddress,
+    unified_accounts: &UnifiedAccounts,
+    _address: &SaplingZPaymentAddress,
     viewing_key: &zewif::sapling::SaplingIncomingViewingKey,
 ) -> Option<UfvkFingerprint> {
     // Look up the full viewing key associated with this incoming viewing key
@@ -460,7 +465,7 @@ fn extract_account_id_from_keypath(keypath: &str) -> Option<u32> {
 
 /// Find the account key ID based on account ID
 fn find_account_key_id_by_account_id(
-    unified_accounts: &crate::UnifiedAccounts,
+    unified_accounts: &UnifiedAccounts,
     account_id: u32,
 ) -> Option<UfvkFingerprint> {
     for (key_id, account_metadata) in &unified_accounts.account_metadata {
@@ -473,7 +478,7 @@ fn find_account_key_id_by_account_id(
 
 /// Find the account key ID based on seed fingerprint
 fn find_account_key_id_by_seed_fingerprint(
-    unified_accounts: &crate::UnifiedAccounts,
+    unified_accounts: &UnifiedAccounts,
     seed_fp: &zewif::Blob32,
 ) -> Option<UfvkFingerprint> {
     let seed_fp_hex = hex::encode(seed_fp.as_ref());
@@ -490,7 +495,7 @@ fn find_account_key_id_by_seed_fingerprint(
 /// Initialize an AddressRegistry based on the unified accounts data
 pub fn initialize_address_registry(
     wallet: &ZcashdWallet,
-    unified_accounts: &crate::UnifiedAccounts,
+    unified_accounts: &UnifiedAccounts,
 ) -> Result<AddressRegistry> {
     let mut registry = AddressRegistry::new();
 

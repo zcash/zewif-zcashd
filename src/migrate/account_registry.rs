@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use zewif::Account;
 
-use crate::UfvkFingerprint;
+use crate::zcashd_wallet::UfvkFingerprint;
 
 struct AccountRegistry {
     accounts: Vec<Account>,

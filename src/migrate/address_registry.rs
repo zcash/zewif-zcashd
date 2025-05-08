@@ -10,7 +10,7 @@ use zcash_protocol::consensus::NetworkType;
 
 use zewif::ProtocolAddress;
 
-use crate::{UfvkFingerprint, UnifiedAddressMetadata};
+use crate::zcashd_wallet::{ReceiverType, UfvkFingerprint, UnifiedAddressMetadata};
 
 bitflags! {
     /// A set of flags describing the type(s) of outputs that a Zcash address can receive.
@@ -118,10 +118,10 @@ impl AddressId {
         let mut receiver_flags = ReceiverFlags::empty();
         for t in &meta.receiver_types {
             receiver_flags |= match t {
-                crate::zcashd::ReceiverType::P2PKH => ReceiverFlags::P2PKH,
-                crate::zcashd::ReceiverType::P2SH => ReceiverFlags::P2SH,
-                crate::zcashd::ReceiverType::Sapling => ReceiverFlags::SAPLING,
-                crate::zcashd::ReceiverType::Orchard => ReceiverFlags::ORCHARD,
+                ReceiverType::P2PKH => ReceiverFlags::P2PKH,
+                ReceiverType::P2SH => ReceiverFlags::P2SH,
+                ReceiverType::Sapling => ReceiverFlags::SAPLING,
+                ReceiverType::Orchard => ReceiverFlags::ORCHARD,
             }
         }
         AddressId::DerivationMeta {
@@ -273,8 +273,9 @@ impl AddressRegistry {
 mod tests {
     use zewif::{ProtocolAddress, sapling, transparent};
 
+    use crate::zcashd_wallet::UfvkFingerprint;
+
     use super::{AddressId, AddressRegistry};
-    use crate::UfvkFingerprint;
 
     #[test]
     fn test_address_id_from_protocol_address() {

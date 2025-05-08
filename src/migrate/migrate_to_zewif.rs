@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 
-use crate::{UfvkFingerprint, ZcashdWallet};
+use crate::{ZcashdWallet, zcashd_wallet::UfvkFingerprint};
 
 use zewif::{self, Account, BlockHeight, TxId, Zewif, ZewifWallet};
 

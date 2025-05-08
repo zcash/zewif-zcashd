@@ -7,12 +7,19 @@ use zcash_keys::keys::UnifiedFullViewingKey;
 use zewif::{Bip39Mnemonic, SeedFingerprint, TxId, sapling::SaplingIncomingViewingKey};
 
 use crate::{
-    Address, BlockLocator, ClientVersion, DBValue, Key, KeyMetadata, KeyPoolEntry, Keys,
-    MnemonicHDChain, NetworkInfo, OrchardNoteCommitmentTree, PrivKey, PubKey, RecipientAddress,
-    RecipientMapping, SaplingKey, SaplingKeys, SaplingZPaymentAddress, SproutKeys,
-    SproutPaymentAddress, SproutSpendingKey, UfvkFingerprint, UnifiedAccountMetadata,
-    UnifiedAccounts, UnifiedAddressMetadata, WalletTx, ZcashdDump, ZcashdWallet, parse,
-    parser::prelude::*, zcashd::u252, zcashd_dump::DBKey,
+    DBValue, ZcashdDump, ZcashdWallet, parse,
+    parser::prelude::*,
+    zcashd_dump::DBKey,
+    zcashd_wallet::{
+        Address, BlockLocator, ClientVersion, KeyMetadata, MnemonicHDChain, NetworkInfo,
+        RecipientAddress, RecipientMapping, UfvkFingerprint, UnifiedAccountMetadata,
+        UnifiedAccounts, UnifiedAddressMetadata,
+        orchard::OrchardNoteCommitmentTree,
+        sapling::{SaplingKey, SaplingKeys, SaplingZPaymentAddress},
+        sprout::{SproutKeys, SproutPaymentAddress, SproutSpendingKey},
+        transparent::{Key, KeyPoolEntry, Keys, PrivKey, PubKey},
+        u252,
+    },
 };
 
 #[derive(Debug)]
@@ -277,7 +284,7 @@ impl<'a> ZcashdParser<'a> {
             let ivk = parse!(buf = &key.data, SaplingIncomingViewingKey, "ivk")?;
             let spending_key = parse!(
                 buf = value.as_data(),
-                sapling::zip32::ExtendedSpendingKey,
+                ::sapling::zip32::ExtendedSpendingKey,
                 "spending_key"
             )?;
             let metakey = DBKey::new("sapzkeymeta", &key.data);

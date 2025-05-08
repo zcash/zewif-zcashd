@@ -14,7 +14,7 @@
 //! Import this module when implementing parsing for new types:
 //!
 //! ```ignore
-//! use zewif::parser::prelude::*;
+//! use zewif_zcashd::parser::prelude::*;
 //! use anyhow::Result;
 //!
 //! struct MyType {}
@@ -31,6 +31,6 @@
 //! `std::prelude`) of providing the most commonly needed imports in a single module.
 
 #[doc(hidden)]
-pub use super::parseable_types::*;
-#[doc(hidden)]
 pub use super::parser_impl::*;
+#[doc(hidden)]
+pub use crate::zcashd_wallet::*;

@@ -59,4 +59,3 @@ pub(crate) mod parse_macro;
 pub mod prelude;
 
 mod_use!(parser_impl);
-mod_use!(parseable_types);

@@ -5,13 +5,15 @@ use sha2::Sha256;
 use std::collections::HashSet;
 use zewif::TxId;
 
-use crate::{ZcashdWallet, zcashd::u160};
+use crate::{
+    zcashd_wallet::{transparent::{KeyId, ScriptId}, u160, RecipientAddress, WalletTx}, ZcashdWallet
+};
 
 /// Extract all addresses involved in a transaction
 pub fn extract_transaction_addresses(
     wallet: &ZcashdWallet,
     tx_id: TxId,
-    tx: &crate::WalletTx,
+    tx: &WalletTx,
 ) -> Result<HashSet<String>> {
     let mut addresses = HashSet::new();
     let mut is_change_transaction = false;
@@ -29,23 +31,23 @@ pub fn extract_transaction_addresses(
 
             // Add the recipient address based on the type
             match &recipient.recipient_address {
-                crate::RecipientAddress::Sapling(addr) => {
+                RecipientAddress::Sapling(addr) => {
                     let addr_str = addr.to_string(wallet.network());
                     addresses.insert(addr_str.clone());
                     addresses.insert(format!("sapling_addr:{}", addr_str));
                 }
-                crate::RecipientAddress::Orchard(addr) => {
+                RecipientAddress::Orchard(addr) => {
                     let addr_str = addr.to_string(wallet.network());
                     addresses.insert(addr_str.clone());
                     addresses.insert(format!("orchard_addr:{}", addr_str));
                 }
-                crate::RecipientAddress::KeyId(key_id) => {
+                RecipientAddress::KeyId(key_id) => {
                     // Convert P2PKH key hash to a Zcash address
                     let addr_str = key_id.to_string(wallet.network());
                     addresses.insert(addr_str.clone());
                     addresses.insert(format!("transparent_addr:{}", addr_str));
                 }
-                crate::RecipientAddress::ScriptId(script_id) => {
+                RecipientAddress::ScriptId(script_id) => {
                     // Convert P2SH script hash to a Zcash address
                     let addr_str = script_id.to_string(wallet.network());
                     addresses.insert(addr_str.clone());
@@ -97,7 +99,7 @@ pub fn extract_transaction_addresses(
                     let pubkey_hash = ripemd160.finalize();
 
                     // Create a transparent P2PKH address
-                    let key_id = crate::KeyId::from(
+                    let key_id = KeyId::from(
                         u160::from_slice(&pubkey_hash[..])
                             .expect("Creating u160 from RIPEMD160 hash"),
                     );
@@ -139,7 +141,7 @@ pub fn extract_transaction_addresses(
                 if script_data[23] == 0x88 && script_data[24] == 0xAC {
                     // Extract the pubkey hash and create an address
                     let pubkey_hash = &script_data[3..23];
-                    let key_id = crate::KeyId::from(
+                    let key_id = KeyId::from(
                         u160::from_slice(pubkey_hash).expect("Creating u160 from pubkey hash"),
                     );
                     let addr_str = key_id.to_string(wallet.network());
@@ -152,7 +154,7 @@ pub fn extract_transaction_addresses(
             else if script_data.len() >= 23 && script_data[0] == 0xA9 && script_data[22] == 0x87 {
                 // Extract the script hash and create an address
                 let script_hash = &script_data[2..22];
-                let script_id = crate::ScriptId::from(
+                let script_id = ScriptId::from(
                     u160::from_slice(script_hash).expect("Creating u160 from script hash"),
                 );
                 let addr_str = script_id.to_string(wallet.network());
@@ -285,9 +287,7 @@ pub fn extract_transaction_addresses(
                     // If we have recipient data from the transaction, link it
                     if let Some(recipients) = wallet.send_recipients().get(&tx_id) {
                         for recipient in recipients {
-                            if let crate::RecipientAddress::Orchard(addr) =
-                                &recipient.recipient_address
-                            {
+                            if let RecipientAddress::Orchard(addr) = &recipient.recipient_address {
                                 addresses.insert(format!(
                                     "orchard_recipient:{}",
                                     addr.to_string(wallet.network())

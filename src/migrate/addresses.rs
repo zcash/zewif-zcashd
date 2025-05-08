@@ -8,9 +8,9 @@ use zewif::{Account, ProtocolAddress, UnifiedAddress, sapling::SaplingExtendedSp
 
 use super::keys::find_sapling_key_for_ivk;
 use crate::{
-    UfvkFingerprint, ZcashdWallet,
+    ZcashdWallet,
     migrate::{AddressId, AddressRegistry},
-    zcashd::ReceiverType,
+    zcashd_wallet::{Address, ReceiverType, UfvkFingerprint},
 };
 
 /// Convert ZCashd transparent addresses to Zewif format
@@ -102,7 +102,7 @@ pub fn convert_sapling_addresses(
         let mut zewif_address = zewif::Address::new(protocol_address);
 
         // Set purpose if available - convert to Address type for lookup
-        let zcashd_address = crate::Address::from(address_str.clone());
+        let zcashd_address = Address::from(address_str.clone());
         if let Some(purpose) = wallet.address_purposes().get(&zcashd_address) {
             zewif_address.set_purpose(purpose.clone());
         }
