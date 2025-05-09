@@ -37,4 +37,4 @@ default = []
 with-context = []
 
 [patch.crates-io]
-zewif = { git = "https://github.com/BlockchainCommons/zewif.git", rev = "18592063cce454158e8110d0bd11be869fb67f60" }
+zewif = { git = "https://github.com/nuttycom/zewif.git", rev = "9514ce42e0e8dd9a863359134bba621fd7065b45" }

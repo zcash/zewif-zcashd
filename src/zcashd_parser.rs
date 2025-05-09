@@ -4,7 +4,9 @@ use std::{
     collections::{HashMap, HashSet},
 };
 use zcash_keys::keys::UnifiedFullViewingKey;
-use zewif::{Bip39Mnemonic, SeedFingerprint, TxId, sapling::SaplingIncomingViewingKey};
+use zewif::{
+    Bip39Mnemonic, Data, LegacySeed, SeedFingerprint, TxId, sapling::SaplingIncomingViewingKey,
+};
 
 use crate::{
     DBValue, ZcashdDump, ZcashdWallet, parse,
@@ -81,7 +83,8 @@ impl<'a> ZcashdParser<'a> {
 
         // **hdchain**
 
-        // ~~hdseed~~: Removed in 5.0.0
+        // hdseed
+        let legacy_hd_seed = self.parse_hdseed()?;
 
         // key
         // keymeta
@@ -177,6 +180,7 @@ impl<'a> ZcashdParser<'a> {
             key_pool,
             keys,
             min_version,
+            legacy_hd_seed,
             mnemonic_hd_chain,
             mnemonic_phrase,
             network_info,
@@ -466,6 +470,21 @@ impl<'a> ZcashdParser<'a> {
             full_viewing_keys,
             account_metadata,
         ))
+    }
+
+    fn parse_hdseed(&self) -> Result<Option<LegacySeed>> {
+        Ok(if self.dump.has_value_for_keyname("hdseed") {
+            let (key, value) = self
+                .dump
+                .record_for_keyname("hdseed")
+                .context("Getting 'hdseed' record")?;
+            let fingerprint = parse!(buf = &key.data, SeedFingerprint, "seed fingerprint")?;
+            let seed_data = parse!(buf = &value, Data, "legacy seed data")?;
+            self.mark_key_parsed(&key);
+            Some(LegacySeed::new(seed_data, Some(fingerprint)))
+        } else {
+            None
+        })
     }
 
     fn parse_mnemonic_phrase(&self) -> Result<Bip39Mnemonic> {
