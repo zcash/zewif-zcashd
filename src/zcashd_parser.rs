@@ -293,7 +293,7 @@ impl<'a> ZcashdParser<'a> {
                 .value_for_key(&metakey)
                 .context("Getting sapzkeymeta metadata")?;
             let metadata = parse!(buf = metadata_binary, KeyMetadata, "sapzkeymeta metadata")?;
-            let keypair = SaplingKey::new(ivk.clone(), spending_key.clone(), metadata)
+            let keypair = SaplingKey::new(ivk, spending_key.clone(), metadata)
                 .context("Creating keypair")?;
             keys_map.insert(ivk, keypair);
 
@@ -401,7 +401,7 @@ impl<'a> ZcashdParser<'a> {
                 UnifiedAccountMetadata,
                 "UnifiedAccountMetadata key"
             )?;
-            account_metadata.insert(metadata.ufvk_fingerprint().clone(), metadata);
+            account_metadata.insert(*metadata.ufvk_fingerprint(), metadata);
             let v: u32 = parse!(buf = value.as_data(), u32, "UnifiedAccountMetadata value")?;
             if v != 0 {
                 bail!("Unexpected value for UnifiedAccountMetadata: 0x{:08x}", v);

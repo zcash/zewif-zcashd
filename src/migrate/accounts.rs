@@ -103,8 +103,7 @@ pub fn convert_unified_accounts(
 
             // Add the address to the account
             account.add_address(zewif_address);
-        } else {
-        }
+        } 
     }
 
     // // Step 4: Log information about viewing keys in unified_accounts
@@ -484,7 +483,7 @@ fn find_account_key_id_by_seed_fingerprint(
     let seed_fp_hex = hex::encode(seed_fp.as_ref());
     for (key_id, account_metadata) in &unified_accounts.account_metadata {
         // Convert the account's seed fingerprint to hex and compare
-        let account_seed_fp_hex = format!("{}", account_metadata.seed_fingerprint().to_hex());
+        let account_seed_fp_hex = account_metadata.seed_fingerprint().to_hex().to_string();
         if account_seed_fp_hex == seed_fp_hex {
             return Some(*key_id);
         }

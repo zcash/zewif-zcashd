@@ -215,7 +215,7 @@ pub fn extract_transaction_addresses(
 
         for output in bundle.shielded_outputs() {
             // Track the commitment
-            let cm_hex = hex::encode(&output.cmu().to_bytes());
+            let cm_hex = hex::encode(output.cmu().to_bytes());
             addresses.insert(format!("sapling_commitment:{}", cm_hex));
 
             // If we have note data for this output, find the address
