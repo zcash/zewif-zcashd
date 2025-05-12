@@ -33,7 +33,7 @@ use zewif::{Bip39Mnemonic, Network, TxId, sapling::SaplingIncomingViewingKey};
 use orchard::OrchardNoteCommitmentTree;
 use sapling::{SaplingKeys, SaplingZPaymentAddress};
 use sprout::SproutKeys;
-use transparent::{KeyPoolEntry, Keys, PubKey};
+use transparent::{KeyPoolEntry, Keys, PubKey, WalletKeys};
 
 #[derive(Debug)]
 pub struct ZcashdWallet {
@@ -55,6 +55,7 @@ pub struct ZcashdWallet {
     sapling_z_addresses: HashMap<SaplingZPaymentAddress, SaplingIncomingViewingKey>,
     send_recipients: HashMap<TxId, Vec<RecipientMapping>>,
     sprout_keys: Option<SproutKeys>,
+    wallet_keys: Option<WalletKeys>,
     transactions: HashMap<TxId, WalletTx>,
     unified_accounts: UnifiedAccounts,
     witnesscachesize: i64,
@@ -81,6 +82,7 @@ impl ZcashdWallet {
         sapling_z_addresses: HashMap<SaplingZPaymentAddress, SaplingIncomingViewingKey>,
         send_recipients: HashMap<TxId, Vec<RecipientMapping>>,
         sprout_keys: Option<SproutKeys>,
+        wallet_keys: Option<WalletKeys>,
         transactions: HashMap<TxId, WalletTx>,
         unified_accounts: UnifiedAccounts,
         witnesscachesize: i64,
@@ -104,6 +106,7 @@ impl ZcashdWallet {
             sapling_z_addresses,
             send_recipients,
             sprout_keys,
+            wallet_keys,
             transactions,
             unified_accounts,
             witnesscachesize,

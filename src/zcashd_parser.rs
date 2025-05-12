@@ -17,7 +17,7 @@ use crate::{
         orchard::OrchardNoteCommitmentTree,
         sapling::{SaplingKey, SaplingKeys, SaplingZPaymentAddress},
         sprout::{SproutKeys, SproutPaymentAddress, SproutSpendingKey},
-        transparent::{Key, KeyPoolEntry, Keys, PrivKey, PubKey},
+        transparent::{Key, KeyPoolEntry, Keys, PrivKey, PubKey, WalletKey, WalletKeys},
         u252,
     },
 };
@@ -126,6 +126,7 @@ impl<'a> ZcashdParser<'a> {
         let witnesscachesize = self.parse_i64("witnesscachesize")?;
 
         // wkey
+        let wallet_keys = self.parse_wallet_keys()?;
 
         // zkey
         // zkeymeta
@@ -185,6 +186,7 @@ impl<'a> ZcashdParser<'a> {
             sapling_z_addresses,
             send_recipients,
             sprout_keys,
+            wallet_keys,
             transactions,
             unified_accounts,
             witnesscachesize,
@@ -262,6 +264,36 @@ impl<'a> ZcashdParser<'a> {
             self.mark_key_parsed(&metakey);
         }
         Ok(Keys::new(keys_map))
+    }
+
+    fn parse_wallet_keys(&self) -> Result<Option<WalletKeys>> {
+        let key_records = self
+            .dump
+            .records_for_keyname("wkey")
+            .context("Getting 'wkey' records")?;
+        if key_records.is_empty() {
+            return Ok(None);
+        }
+        let mut keys_map = HashMap::new();
+        for (key, value) in key_records {
+            let pubkey = parse!(buf = &key.data, PubKey, "pubkey")?;
+            let mut parser = Parser::new(value.as_data());
+            let privkey = parse!(&mut parser, PrivKey, "privkey")?;
+            let time_created = parse!(&mut parser, SecondsSinceEpoch, "time_created")?;
+            let time_expires = parse!(&mut parser, SecondsSinceEpoch, "time_expires")?;
+            let comment = parse!(&mut parser, String, "comment")?;
+            let wallet_key = WalletKey::new(
+                pubkey.clone(),
+                privkey.clone(),
+                time_created,
+                time_expires,
+                comment
+            );
+            keys_map.insert(pubkey, wallet_key);
+
+            self.mark_key_parsed(&key);
+        }
+        Ok(Some(WalletKeys::new(keys_map)))
     }
 
     fn parse_sapling_keys(&self) -> Result<SaplingKeys> {
