@@ -267,6 +267,9 @@ impl<'a> ZcashdParser<'a> {
     }
 
     fn parse_wallet_keys(&self) -> Result<Option<WalletKeys>> {
+        if !self.dump.has_keys_for_keyname("wkey") {
+            return Ok(None);
+        }
         let key_records = self
             .dump
             .records_for_keyname("wkey")
