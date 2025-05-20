@@ -20,7 +20,7 @@ use crate::{
         orchard::OrchardNoteCommitmentTree,
         sapling::{SaplingKey, SaplingKeys, SaplingZPaymentAddress},
         sprout::{SproutKeys, SproutPaymentAddress, SproutSpendingKey},
-        transparent::{Key, KeyPoolEntry, Keys, PrivKey, PubKey, WalletKey, WalletKeys},
+        transparent::{KeyPair, KeyPoolEntry, Keys, PrivKey, PubKey, WalletKey, WalletKeys},
         u252,
     },
 };
@@ -263,8 +263,8 @@ impl<'a> ZcashdParser<'a> {
                 .value_for_key(&metakey)
                 .context("Getting metadata")?;
             let metadata = parse!(buf = metadata_binary, KeyMetadata, "metadata")?;
-            let keypair =
-                Key::new(pubkey.clone(), privkey.clone(), metadata).context("Creating keypair")?;
+            let keypair = KeyPair::new(pubkey.clone(), privkey.clone(), metadata)
+                .context("Creating keypair")?;
             keys_map.insert(pubkey, keypair);
 
             self.mark_key_parsed(&key);
@@ -297,7 +297,7 @@ impl<'a> ZcashdParser<'a> {
                 privkey.clone(),
                 time_created,
                 time_expires,
-                comment
+                comment,
             );
             keys_map.insert(pubkey, wallet_key);
 
@@ -335,8 +335,8 @@ impl<'a> ZcashdParser<'a> {
                 .value_for_key(&metakey)
                 .context("Getting sapzkeymeta metadata")?;
             let metadata = parse!(buf = metadata_binary, KeyMetadata, "sapzkeymeta metadata")?;
-            let keypair = SaplingKey::new(ivk, spending_key.clone(), metadata)
-                .context("Creating keypair")?;
+            let keypair =
+                SaplingKey::new(ivk, spending_key.clone(), metadata).context("Creating keypair")?;
             keys_map.insert(ivk, keypair);
 
             self.mark_key_parsed(&key);
