@@ -582,7 +582,7 @@ impl<'a> ZcashdParser<'a> {
             .value_for_keyname("orchard_note_commitment_tree")
             .context("Getting 'orchard_note_commitment_tree' record")?;
         let orchard_note_commitment_tree = parse!(
-            buf = value.as_data(),
+            buf = &&value.as_data()[4..],
             OrchardNoteCommitmentTree,
             "orchard note commitment tree"
         )?;
