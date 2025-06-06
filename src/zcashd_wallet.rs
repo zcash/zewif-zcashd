@@ -197,6 +197,10 @@ impl ZcashdWallet {
         &self.transactions
     }
 
+    pub fn wallet_keys(&self) -> Option<&WalletKeys> {
+        self.wallet_keys.as_ref()
+    }
+
     pub fn unified_accounts(&self) -> &UnifiedAccounts {
         &self.unified_accounts
     }
