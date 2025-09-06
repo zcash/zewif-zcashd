@@ -1,4 +1,5 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
+use crate::parser::error::ParseError;
 use hex::ToHex as _;
 use std::{
     cell::RefCell,
@@ -251,7 +252,15 @@ impl<'a> ZcashdParser<'a> {
             .records_for_keyname("keymeta")
             .context("Getting 'keymeta' records")?;
         if key_records.len() != keymeta_records.len() {
-            bail!("Mismatched key and keymeta records");
+            return Err(ParseError::InvalidData {
+                kind: InvalidDataKind::RecordCountMismatch {
+                    record_type: RecordType::Key,
+                    metadata_type: MetadataType::KeyMeta,
+                    record_count: key_records.len(),
+                    metadata_count: keymeta_records.len(),
+                },
+                context: Some("key parsing".to_string()),
+            }.into());
         }
         let mut keys_map = HashMap::new();
         for (key, value) in key_records {
@@ -320,7 +329,15 @@ impl<'a> ZcashdParser<'a> {
             .records_for_keyname("sapzkeymeta")
             .context("Getting 'sapzkeymeta' records")?;
         if key_records.len() != keymeta_records.len() {
-            bail!("Mismatched sapzkey and sapzkeymeta records");
+            return Err(ParseError::InvalidData {
+                kind: InvalidDataKind::RecordCountMismatch {
+                    record_type: RecordType::SapzKey,
+                    metadata_type: MetadataType::SapzKeyMeta,
+                    record_count: key_records.len(),
+                    metadata_count: keymeta_records.len(),
+                },
+                context: Some("sapzkey parsing".to_string()),
+            }.into());
         }
         for (key, value) in key_records {
             let ivk = parse!(buf = &key.data, SaplingIncomingViewingKey, "ivk").map_err(anyhow::Error::from)?;
@@ -358,7 +375,15 @@ impl<'a> ZcashdParser<'a> {
             .records_for_keyname("zkeymeta")
             .context("Getting 'zkeymeta' records")?;
         if zkey_records.len() != zkeymeta_records.len() {
-            bail!("Mismatched zkey and zkeymeta records");
+            return Err(ParseError::InvalidData {
+                kind: InvalidDataKind::RecordCountMismatch {
+                    record_type: RecordType::ZKey,
+                    metadata_type: MetadataType::ZKeyMeta,
+                    record_count: zkey_records.len(),
+                    metadata_count: zkeymeta_records.len(),
+                },
+                context: Some("zkey parsing".to_string()),
+            }.into());
         }
         let mut zkeys_map = HashMap::new();
         for (key, value) in zkey_records {
@@ -430,7 +455,14 @@ impl<'a> ZcashdParser<'a> {
             address_metadata.push(metadata);
             let v: u32 = parse!(buf = value.as_data(), u32, "UnifiedAddressMetadata value").map_err(anyhow::Error::from)?;
             if v != 0 {
-                bail!("Unexpected value for UnifiedAddressMetadata: 0x{:08x}", v);
+                return Err(ParseError::InvalidData {
+                    kind: InvalidDataKind::UnexpectedUnifiedMetadataValue {
+                        metadata_type: UnifiedMetadataType::Address,
+                        expected: 0,
+                        actual: v,
+                    },
+                    context: Some("UnifiedAddressMetadata parsing".to_string()),
+                }.into());
             }
             self.mark_key_parsed(&key);
         }
@@ -446,7 +478,14 @@ impl<'a> ZcashdParser<'a> {
             account_metadata.insert(*metadata.ufvk_fingerprint(), metadata);
             let v: u32 = parse!(buf = value.as_data(), u32, "UnifiedAccountMetadata value").map_err(anyhow::Error::from)?;
             if v != 0 {
-                bail!("Unexpected value for UnifiedAccountMetadata: 0x{:08x}", v);
+                return Err(ParseError::InvalidData {
+                    kind: InvalidDataKind::UnexpectedUnifiedMetadataValue {
+                        metadata_type: UnifiedMetadataType::Account,
+                        expected: 0,
+                        actual: v,
+                    },
+                    context: Some("UnifiedAccountMetadata parsing".to_string()),
+                }.into());
             }
             self.mark_key_parsed(&key);
         }
@@ -512,7 +551,13 @@ impl<'a> ZcashdParser<'a> {
             let address = parse!(buf = &key.data, Address, "address").map_err(anyhow::Error::from)?;
             let name = parse!(buf = value.as_data(), String, "name").map_err(anyhow::Error::from)?;
             if address_names.contains_key(&address) {
-                bail!("Duplicate address found: {}", address);
+                return Err(ParseError::InvalidData {
+                    kind: InvalidDataKind::DuplicateEntry {
+                        entry_type: DuplicateEntryType::AddressName,
+                        key: address.to_string(),
+                    },
+                    context: Some("address name parsing".to_string()),
+                }.into());
             }
             address_names.insert(address, name);
 
@@ -531,7 +576,13 @@ impl<'a> ZcashdParser<'a> {
             let address = parse!(buf = &key.data, Address, "address").map_err(anyhow::Error::from)?;
             let purpose = parse!(buf = value.as_data(), String, "purpose").map_err(anyhow::Error::from)?;
             if address_purposes.contains_key(&address) {
-                bail!("Duplicate address found: {}", address);
+                return Err(ParseError::InvalidData {
+                    kind: InvalidDataKind::DuplicateEntry {
+                        entry_type: DuplicateEntryType::AddressPurpose,
+                        key: address.to_string(),
+                    },
+                    context: Some("address purpose parsing".to_string()),
+                }.into());
             }
             address_purposes.insert(address, purpose);
 
@@ -560,7 +611,13 @@ impl<'a> ZcashdParser<'a> {
                 "viewing key"
             ).map_err(anyhow::Error::from)?;
             if sapling_z_addresses.contains_key(&payment_address) {
-                bail!("Duplicate payment address found: {:?}", payment_address);
+                return Err(ParseError::InvalidData {
+                    kind: InvalidDataKind::DuplicateEntry {
+                        entry_type: DuplicateEntryType::PaymentAddress,
+                        key: format!("{:?}", payment_address),
+                    },
+                    context: Some("sapling payment address parsing".to_string()),
+                }.into());
             }
             sapling_z_addresses.insert(payment_address, viewing_key);
 
@@ -621,7 +678,13 @@ impl<'a> ZcashdParser<'a> {
                 match parse!(buf = value.as_data(), WalletTx, "transaction", trace).map_err(anyhow::Error::from) {
                     Ok(transaction) => {
                         if transactions.contains_key(&txid) {
-                            bail!("Duplicate transaction found: {:?}", txid);
+                            return Err(ParseError::InvalidData {
+                                kind: InvalidDataKind::DuplicateEntry {
+                                    entry_type: DuplicateEntryType::Transaction,
+                                    key: format!("{:?}", txid),
+                                },
+                                context: Some("transaction parsing".to_string()),
+                            }.into());
                         }
                         transactions.insert(txid, transaction);
                     }

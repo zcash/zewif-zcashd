@@ -18,6 +18,34 @@ pub enum ParseError {
     Anyhow(String),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecordType {
+    Key,
+    SapzKey,
+    ZKey,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetadataType {
+    KeyMeta,
+    SapzKeyMeta, 
+    ZKeyMeta,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnifiedMetadataType {
+    Address,
+    Account,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DuplicateEntryType {
+    AddressName,
+    AddressPurpose,
+    PaymentAddress,
+    Transaction,
+}
+
 #[derive(Debug, Clone)]
 pub enum InvalidDataKind {
     LengthInvalid {
@@ -50,6 +78,24 @@ pub enum InvalidDataKind {
     },
     Utf8Error {
         error: std::string::FromUtf8Error,
+    },
+    // Database record inconsistencies
+    RecordCountMismatch {
+        record_type: RecordType,
+        metadata_type: MetadataType,
+        record_count: usize,
+        metadata_count: usize,
+    },
+    // Unexpected metadata values
+    UnexpectedUnifiedMetadataValue {
+        metadata_type: UnifiedMetadataType,
+        expected: u32,
+        actual: u32,
+    },
+    // Duplicate entries in collections
+    DuplicateEntry {
+        entry_type: DuplicateEntryType,
+        key: String,
     },
     Other {
         message: String,
@@ -115,6 +161,46 @@ impl fmt::Display for ParseError {
     }
 }
 
+impl fmt::Display for RecordType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RecordType::Key => write!(f, "key"),
+            RecordType::SapzKey => write!(f, "sapzkey"),
+            RecordType::ZKey => write!(f, "zkey"),
+        }
+    }
+}
+
+impl fmt::Display for MetadataType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MetadataType::KeyMeta => write!(f, "keymeta"),
+            MetadataType::SapzKeyMeta => write!(f, "sapzkeymeta"),
+            MetadataType::ZKeyMeta => write!(f, "zkeymeta"),
+        }
+    }
+}
+
+impl fmt::Display for UnifiedMetadataType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UnifiedMetadataType::Address => write!(f, "UnifiedAddressMetadata"),
+            UnifiedMetadataType::Account => write!(f, "UnifiedAccountMetadata"),
+        }
+    }
+}
+
+impl fmt::Display for DuplicateEntryType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DuplicateEntryType::AddressName => write!(f, "address name"),
+            DuplicateEntryType::AddressPurpose => write!(f, "address purpose"),
+            DuplicateEntryType::PaymentAddress => write!(f, "payment address"),
+            DuplicateEntryType::Transaction => write!(f, "transaction"),
+        }
+    }
+}
+
 impl fmt::Display for InvalidDataKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -141,6 +227,17 @@ impl fmt::Display for InvalidDataKind {
             }
             InvalidDataKind::Utf8Error { error } => {
                 write!(f, "UTF-8 decode error: {}", error)
+            }
+            InvalidDataKind::RecordCountMismatch { record_type, metadata_type, record_count, metadata_count } => {
+                write!(f, "Mismatched {} and {} records: {} records vs {} metadata entries", 
+                       record_type, metadata_type, record_count, metadata_count)
+            }
+            InvalidDataKind::UnexpectedUnifiedMetadataValue { metadata_type, expected, actual } => {
+                write!(f, "Unexpected value for {}: expected 0x{:08x}, got 0x{:08x}", 
+                       metadata_type, expected, actual)
+            }
+            InvalidDataKind::DuplicateEntry { entry_type, key } => {
+                write!(f, "Duplicate {} found: {}", entry_type, key)
             }
             InvalidDataKind::Other { message } => {
                 write!(f, "{}", message)
