@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::bail;
 
 use crate::{parse, parser::prelude::*};
 

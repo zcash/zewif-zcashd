@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum ParseError {
     BufferUnderflow {
         offset: usize,
@@ -14,6 +14,8 @@ pub enum ParseError {
         message: String,
         context: Option<String>,
     },
+    // Wrapper for anyhow errors during migration
+    Anyhow(anyhow::Error),
 }
 
 impl ParseError {
@@ -29,6 +31,9 @@ impl ParseError {
                     message,
                     context: Some(new_context),
                 }
+            }
+            ParseError::Anyhow(err) => {
+                ParseError::Anyhow(err.context(context.into()))
             }
             other => ParseError::InvalidData {
                 message: other.to_string(),
@@ -61,11 +66,23 @@ impl fmt::Display for ParseError {
                     write!(f, "{}", message)
                 }
             }
+            ParseError::Anyhow(err) => {
+                write!(f, "{}", err)
+            }
         }
     }
 }
 
 impl std::error::Error for ParseError {}
+
+impl From<anyhow::Error> for ParseError {
+    fn from(err: anyhow::Error) -> Self {
+        ParseError::Anyhow(err)
+    }
+}
+
+// No need for explicit From implementation - anyhow already provides one
+// via its blanket impl for types that implement std::error::Error
 
 impl From<std::io::Error> for ParseError {
     fn from(err: std::io::Error) -> Self {
@@ -94,5 +111,14 @@ pub trait ResultExt<T> {
 impl<T> ResultExt<T> for Result<T> {
     fn with_context<S: Into<String>>(self, context: S) -> Result<T> {
         self.map_err(|e| e.with_context(context))
+    }
+}
+
+impl<T> ResultExt<T> for anyhow::Result<T> {
+    fn with_context<S: Into<String>>(self, context: S) -> Result<T> {
+        match self {
+            Ok(value) => Ok(value),
+            Err(err) => Err(ParseError::Anyhow(err.context(context.into()))),
+        }
     }
 }

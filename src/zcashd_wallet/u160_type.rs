@@ -153,17 +153,8 @@ impl std::fmt::Display for u160 {
     }
 }
 
-impl ParseCustom for u160 {
-    fn parse(p: &mut Parser) -> crate::parser::error::Result<Self> {
-        let bytes = p.next_custom(U160_SIZE)?;
-        let mut array = [0u8; U160_SIZE];
-        array.copy_from_slice(bytes);
-        Ok(Self(array))
-    }
-}
-
 impl Parse for u160 {
-    fn parse(p: &mut Parser) -> anyhow::Result<Self> {
+    fn parse(p: &mut Parser) -> crate::parser::error::Result<Self> {
         let bytes = p.next(U160_SIZE)?;
         let mut array = [0u8; U160_SIZE];
         array.copy_from_slice(bytes);

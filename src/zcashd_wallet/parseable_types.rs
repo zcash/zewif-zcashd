@@ -6,7 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, anyhow, bail};
 use zcash_keys::keys::UnifiedFullViewingKey;
 use zewif::{Blob, Data, SeedFingerprint, sapling::SaplingIncomingViewingKey};
 
@@ -378,7 +378,7 @@ impl Parse for zewif::Bip39Mnemonic {
 }
 
 impl Parse for zewif::BlockHeight {
-    fn parse(p: &mut Parser) -> anyhow::Result<Self> {
+    fn parse(p: &mut Parser) -> Result<Self> {
         let height = parse!(p, u32, "BlockHeight")?;
         Ok(Self::from(height))
     }

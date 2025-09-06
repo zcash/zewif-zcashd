@@ -33,6 +33,6 @@
 #[doc(hidden)]
 pub use super::error::{ParseError, Result, ResultExt};
 #[doc(hidden)]
-pub use super::parser_impl::{Parse, ParseCustom, ParseWithParam, Parser};
+pub use super::parser_impl::{Parse, ParseWithParam, Parser};
 #[doc(hidden)]
 pub use crate::zcashd_wallet::*;

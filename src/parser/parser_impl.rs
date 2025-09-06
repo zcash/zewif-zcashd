@@ -5,21 +5,10 @@
 //! raw bytes. It includes both the low-level `Parser` for byte manipulation and the
 //! higher-level `Parse` and `ParseWithParam` traits for structured type parsing.
 
-use anyhow::Result;
 use zewif::Data;
 
-use crate::parser::error::{ParseError, Result as ParseResult};
+use crate::parser::error::{ParseError, Result};
 
-/// A trait for types that can be parsed from a binary data stream using custom errors.
-///
-/// The `ParseCustom` trait defines a standard interface for deserializing Zcash data types
-/// from binary data using custom error types instead of `anyhow::Error`.
-pub trait ParseCustom {
-    /// Parses an instance of this type from a parser's binary data stream.
-    fn parse(p: &mut Parser) -> ParseResult<Self>
-    where
-        Self: Sized;
-}
 
 /// A trait for types that can be parsed from a binary data stream.
 ///
@@ -240,19 +229,20 @@ impl<'a> Parser<'a> {
 
     pub fn check_finished(&self) -> Result<()> {
         if self.offset < self.buffer.len() {
-            anyhow::bail!("Buffer has {} bytes left", self.remaining());
+            return Err(ParseError::UnconsumedBytes {
+                remaining: self.remaining(),
+            });
         }
         Ok(())
     }
 
     pub fn next(&mut self, n: usize) -> Result<&'a [u8]> {
         if self.offset + n > self.buffer.len() {
-            anyhow::bail!(
-                "Buffer underflow at offset {}, needed {} bytes, only {} remaining",
-                self.offset,
-                n,
-                self.remaining()
-            );
+            return Err(ParseError::BufferUnderflow {
+                offset: self.offset,
+                needed: n,
+                remaining: self.remaining(),
+            });
         }
         let bytes = &self.buffer[self.offset..self.offset + n];
         self.offset += n;
@@ -292,37 +282,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    // Custom error versions
-    pub fn check_finished_custom(&self) -> ParseResult<()> {
-        if self.offset < self.buffer.len() {
-            return Err(ParseError::UnconsumedBytes {
-                remaining: self.remaining(),
-            });
-        }
-        Ok(())
-    }
-
-    pub fn next_custom(&mut self, n: usize) -> ParseResult<&'a [u8]> {
-        if self.offset + n > self.buffer.len() {
-            return Err(ParseError::BufferUnderflow {
-                offset: self.offset,
-                needed: n,
-                remaining: self.remaining(),
-            });
-        }
-        let bytes = &self.buffer[self.offset..self.offset + n];
-        self.offset += n;
-        if self.trace {
-            println!(
-                "\t🟢 next_custom({}): {:?} remaining: {} peek: {:?}",
-                n,
-                hex::encode(bytes),
-                self.remaining(),
-                hex::encode(self.peek(100))
-            );
-        }
-        Ok(bytes)
-    }
 }
 
 impl std::io::Read for &mut Parser<'_> {

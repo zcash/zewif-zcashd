@@ -1,4 +1,4 @@
-use anyhow::Result;
+
 use zewif::Network;
 
 use crate::{parse, parser::prelude::*};

@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::bail;
 
 use crate::{parse, parser::prelude::*, zcashd_wallet::CompactSize};
 
@@ -44,7 +44,7 @@ impl From<ReceiverType> for String {
 impl TryFrom<String> for ReceiverType {
     type Error = anyhow::Error;
 
-    fn try_from(value: String) -> Result<Self> {
+    fn try_from(value: String) -> anyhow::Result<Self> {
         match value.as_str() {
             "P2PKH" => Ok(ReceiverType::P2PKH),
             "P2SH" => Ok(ReceiverType::P2SH),
