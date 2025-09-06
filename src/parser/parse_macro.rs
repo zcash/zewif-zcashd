@@ -64,61 +64,61 @@
 #[macro_export]
 macro_rules! parse {
     (buf = $buf:expr, $type:ty, $context:expr) => {
-        ::anyhow::Context::context(
+        $crate::parser::error::ResultExt::with_context(
             <$type as $crate::parser::Parse>::parse_buf($buf, false),
             format!("Parsing {}", $context),
         )
     };
     (buf = $buf:expr, $type:ty, param = $param:expr, $context:expr) => {
-        ::anyhow::Context::context(
+        $crate::parser::error::ResultExt::with_context(
             <$type as $crate::parser::ParseWithParam<_>>::parse_buf($buf, $param, false),
             format!("Parsing {}", $context),
         )
     };
     (buf = $buf:expr, $type:ty, $context:expr, $trace: expr) => {
-        ::anyhow::Context::context(
+        $crate::parser::error::ResultExt::with_context(
             <$type as $crate::parser::Parse>::parse_buf($buf, $trace),
             format!("Parsing {}", $context),
         )
     };
     (buf = $buf:expr, $type:ty, param = $param:expr, $context:expr, $trace:expr) => {
-        ::anyhow::Context::context(
+        $crate::parser::error::ResultExt::with_context(
             <$type as $crate::parser::ParseWithParam<_>>::parse_buf($buf, $param, $trace),
             format!("Parsing {}", $context),
         )
     };
     ($parser:expr, $type:ty, $context:expr) => {
-        ::anyhow::Context::context(
+        $crate::parser::error::ResultExt::with_context(
             <$type as $crate::parser::Parse>::parse($parser),
             format!("Parsing {}", $context),
         )
     };
     ($parser:expr, $type:ty, param = $param:expr, $context:expr) => {
-        ::anyhow::Context::context(
+        $crate::parser::error::ResultExt::with_context(
             <$type as $crate::parser::ParseWithParam<_>>::parse($parser, $param),
             format!("Parsing {}", $context),
         )
     };
     ($parser:expr, bytes = $length:expr, $context:expr) => {
-        ::anyhow::Context::context(
+        $crate::parser::error::ResultExt::with_context(
             $crate::parser::Parser::next($parser, $length),
             format!("Parsing {}", $context),
         )
     };
     ($parser:expr, data = $length:expr, $context:expr) => {
-        ::anyhow::Context::context(
+        $crate::parser::error::ResultExt::with_context(
             $crate::parser::Parser::next($parser, $length).map(zewif::Data::from_slice),
             format!("Parsing {}", $context),
         )
     };
     ($parser:expr, $context:expr) => {
-        ::anyhow::Context::context(
+        $crate::parser::error::ResultExt::with_context(
             $crate::parser::Parse::parse($parser),
             format!("Parsing {}", $context),
         )
     };
     ($parser:expr, param = $param:expr, $context:expr) => {
-        ::anyhow::Context::context(
+        $crate::parser::error::ResultExt::with_context(
             $crate::parser::ParseWithParam::parse($parser, $param),
             format!("Parsing {}", $context),
         )
@@ -135,59 +135,63 @@ macro_rules! parse {
 #[macro_export]
 macro_rules! parse {
     (buf = $buf:expr, $type:ty, $context:expr) => {
-        ::anyhow::Context::with_context(
+        $crate::parser::error::ResultExt::with_context(
             <$type as $crate::parser::Parse>::parse_buf($buf, false),
-            || format!("Parsing {}", $context),
+            format!("Parsing {}", $context),
         )
     };
     (buf = $buf:expr, $type:ty, param = $param:expr, $context:expr) => {
-        ::anyhow::Context::with_context(
+        $crate::parser::error::ResultExt::with_context(
             <$type as $crate::parser::ParseWithParam<_>>::parse_buf($buf, $param, false),
-            || format!("Parsing {}", $context),
+            format!("Parsing {}", $context),
         )
     };
     (buf = $buf:expr, $type:ty, $context:expr, $trace: expr) => {
-        ::anyhow::Context::with_context(
+        $crate::parser::error::ResultExt::with_context(
             <$type as $crate::parser::Parse>::parse_buf($buf, $trace),
-            || format!("Parsing {}", $context),
+            format!("Parsing {}", $context),
         )
     };
     (buf = $buf:expr, $type:ty, param = $param:expr, $context:expr, $trace:expr) => {
-        ::anyhow::Context::with_context(
+        $crate::parser::error::ResultExt::with_context(
             <$type as $crate::parser::ParseWithParam<_>>::parse_buf($buf, $param, $trace),
-            || format!("Parsing {}", $context),
+            format!("Parsing {}", $context),
         )
     };
     ($parser:expr, $type:ty, $context:expr) => {
-        ::anyhow::Context::with_context(<$type as $crate::parser::Parse>::parse($parser), || {
-            format!("Parsing {}", $context)
-        })
+        $crate::parser::error::ResultExt::with_context(
+            <$type as $crate::parser::Parse>::parse($parser),
+            format!("Parsing {}", $context),
+        )
     };
     ($parser:expr, $type:ty, param = $param:expr, $context:expr) => {
-        ::anyhow::Context::with_context(
+        $crate::parser::error::ResultExt::with_context(
             <$type as $crate::parser::ParseWithParam<_>>::parse($parser, $param),
-            || format!("Parsing {}", $context),
+            format!("Parsing {}", $context),
         )
     };
     ($parser:expr, bytes = $length:expr, $context:expr) => {
-        ::anyhow::Context::with_context($crate::parser::Parser::next($parser, $length), || {
-            format!("Parsing {}", $context)
-        })
+        $crate::parser::error::ResultExt::with_context(
+            $crate::parser::Parser::next($parser, $length),
+            format!("Parsing {}", $context),
+        )
     };
     ($parser:expr, data = $length:expr, $context:expr) => {
-        ::anyhow::Context::with_context($parser.next($length).map(zewif::Data::from_slice), || {
-            format!("Parsing {}", $context)
-        })
+        $crate::parser::error::ResultExt::with_context(
+            $parser.next($length).map(zewif::Data::from_slice),
+            format!("Parsing {}", $context),
+        )
     };
     ($parser:expr, $context:expr) => {
-        ::anyhow::Context::with_context($crate::parser::Parse::parse($parser), || {
-            format!("Parsing {}", $context)
-        })
+        $crate::parser::error::ResultExt::with_context(
+            $crate::parser::Parse::parse($parser),
+            format!("Parsing {}", $context),
+        )
     };
     ($parser:expr, param = $param:expr, $context:expr) => {
-        ::anyhow::Context::with_context(
+        $crate::parser::error::ResultExt::with_context(
             $crate::parser::ParseWithParam::parse($parser, $param),
-            || format!("Parsing {}", $context),
+            format!("Parsing {}", $context),
         )
     };
 }
@@ -199,14 +203,15 @@ macro_rules! blob_parse {
             /// Parses this type from a binary data stream.
             ///
             /// This implementation allows the type to be used with the `parse!` macro.
-            fn parse(parser: &mut $crate::parser::Parser) -> ::anyhow::Result<Self>
+            fn parse(parser: &mut $crate::parser::Parser) -> $crate::parser::error::Result<Self>
             where
                 Self: Sized,
             {
-                let data = parser
-                    .next($size)
-                    .with_context(|| format!("Parsing {}", stringify!($name)))?;
-                Ok(Self::from_slice(data)?)
+                let data = $crate::parser::error::ResultExt::with_context(
+                    parser.next($size),
+                    format!("Parsing {}", stringify!($name))
+                )?;
+                Ok(Self::from_slice(data).map_err(|e| $crate::parser::error::ParseError::invalid_data(e.to_string()))?)
             }
         }
     };
@@ -221,7 +226,7 @@ macro_rules! data_parse {
             /// This implementation allows the type to be used with the `parse!` macro.
             /// The data is parsed as a length-prefixed byte array using a `CompactSize`
             /// value to indicate the length.
-            fn parse(parser: &mut $crate::parser::Parser) -> ::anyhow::Result<Self> {
+            fn parse(parser: &mut $crate::parser::Parser) -> $crate::parser::error::Result<Self> {
                 Ok(Self(zewif::Data::parse(parser)?))
             }
         }
@@ -237,7 +242,7 @@ macro_rules! string_parse {
             /// This implementation allows the type to be used with the `parse!` macro.
             /// The string is assumed to be encoded in the binary format as a length-prefixed
             /// UTF-8 string.
-            fn parse(p: &mut $crate::parser::Parser) -> ::anyhow::Result<Self> {
+            fn parse(p: &mut $crate::parser::Parser) -> $crate::parser::error::Result<Self> {
                 Ok(Self($crate::parse!(p, "string")?))
             }
         }

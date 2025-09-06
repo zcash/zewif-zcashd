@@ -31,6 +31,8 @@
 //! `std::prelude`) of providing the most commonly needed imports in a single module.
 
 #[doc(hidden)]
-pub use super::parser_impl::*;
+pub use super::error::{ParseError, Result, ResultExt};
+#[doc(hidden)]
+pub use super::parser_impl::{Parse, ParseCustom, ParseWithParam, Parser};
 #[doc(hidden)]
 pub use crate::zcashd_wallet::*;

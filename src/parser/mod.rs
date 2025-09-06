@@ -55,6 +55,7 @@
 
 use crate::mod_use;
 
+pub mod error;
 pub(crate) mod parse_macro;
 pub mod prelude;
 

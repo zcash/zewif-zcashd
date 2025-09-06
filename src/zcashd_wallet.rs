@@ -1,5 +1,6 @@
 use zewif::{LegacySeed, mod_use};
 
+pub mod error;
 mod_use!(address);
 mod_use!(block_locator);
 mod_use!(client_version);
