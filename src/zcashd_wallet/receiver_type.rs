@@ -1,6 +1,4 @@
-use anyhow::bail;
-
-use crate::{parse, parser::prelude::*, zcashd_wallet::CompactSize};
+use crate::{parse, parser::prelude::*, zcashd_wallet::{CompactSize, error::ZcashdWalletError}};
 
 /// ZCash receiver types used in Unified Addresses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -48,15 +46,18 @@ impl From<ReceiverType> for String {
 }
 
 impl TryFrom<String> for ReceiverType {
-    type Error = anyhow::Error;
+    type Error = ZcashdWalletError;
 
-    fn try_from(value: String) -> anyhow::Result<Self> {
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         match value.as_str() {
             "P2PKH" => Ok(ReceiverType::P2PKH),
             "P2SH" => Ok(ReceiverType::P2SH),
             "Sapling" => Ok(ReceiverType::Sapling),
             "Orchard" => Ok(ReceiverType::Orchard),
-            _ => bail!("Invalid ReceiverType string: {}", value),
+            _ => Err(ZcashdWalletError::InvalidData {
+                message: format!("Invalid ReceiverType string: {}", value),
+                type_name: "ReceiverType",
+            }),
         }
     }
 }

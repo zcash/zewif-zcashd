@@ -24,7 +24,7 @@ pub const U160_SIZE: usize = 20;
 ///
 /// # Examples
 /// ```
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// # use zewif_zcashd::zcashd_wallet::u160;
 /// # fn example() -> Result<()> {
 /// // Create a u160 from a byte slice (e.g., for a P2PKH address hash)
@@ -65,7 +65,7 @@ impl u160 {
     ///
     /// # Examples
     /// ```
-    /// # use anyhow::Result;
+    /// # use zewif_zcashd::parser::error::Result;
     /// # use zewif_zcashd::zcashd_wallet::{u160, U160_SIZE};
     /// # fn example() -> Result<()> {
     /// // Valid slice (exactly 20 bytes)

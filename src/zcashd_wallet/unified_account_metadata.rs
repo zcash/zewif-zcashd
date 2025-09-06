@@ -1,4 +1,3 @@
-use anyhow::Context;
 use zewif::SeedFingerprint;
 
 use crate::{parse, parser::prelude::*};
@@ -14,7 +13,13 @@ impl UfvkFingerprint {
 
     pub fn from_bytes(xs: &[u8]) -> Result<Self> {
         let id_bytes = <[u8; 32]>::try_from(xs)
-            .context("Failed to parse UFVK fingerprint from unified account ID bytes")?;
+            .map_err(|_| ParseError::InvalidData {
+                kind: InvalidDataKind::LengthInvalid {
+                    expected: 32,
+                    actual: xs.len(),
+                },
+                context: Some("UFVK fingerprint".to_string()),
+            })?;
         Ok(Self(id_bytes))
     }
 

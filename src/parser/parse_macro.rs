@@ -11,7 +11,7 @@
 /// Parse a type that implements the `Parse` trait:
 /// ```no_run
 /// # use zewif_zcashd::{parser::prelude::*, parse, zcashd_wallet::CompactSize};
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// # fn example(parser: &mut Parser) -> Result<()> {
 /// let size = parse!(parser, CompactSize, "transaction size")?;
 /// # Ok(())
@@ -23,7 +23,7 @@
 /// ```no_run
 /// # use zewif::Data;
 /// # use zewif_zcashd::{parser::prelude::*, parse};
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// # fn example(parser: &mut Parser) -> Result<()> {
 /// // Parse 32 bytes (e.g. for a hash)
 /// let bytes = parse!(parser, bytes = 32, "transaction hash")?;

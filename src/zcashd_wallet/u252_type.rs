@@ -1,5 +1,4 @@
-use crate::{parse, parser::prelude::*};
-use anyhow::Error;
+use crate::{parse, parser::prelude::*, zcashd_wallet::error::ZcashdWalletError};
 use zewif::Blob32;
 
 pub const U252_SIZE: usize = 32;
@@ -29,7 +28,7 @@ pub const U252_SIZE: usize = 32;
 /// # use zewif::Blob32;
 /// # use zewif_zcashd::zcashd_wallet::u252;
 /// # 
-/// # fn example() -> anyhow::Result<()> {
+/// # fn example() -> crate::parser::error::Result<()> {
 /// // Create a blob with the top 4 bits set to zero
 /// let mut data = [0u8; 32];
 /// data[0] = 0x0F; // Only using the bottom 4 bits of the first byte
@@ -55,7 +54,7 @@ impl u252 {
     /// # use zewif::Blob32;
     /// # use zewif_zcashd::zcashd_wallet::u252;
     /// # 
-    /// # fn example() -> anyhow::Result<()> {
+    /// # fn example() -> crate::parser::error::Result<()> {
     /// // Valid u252 (MSB has top 4 bits = 0)
     /// let valid_bytes = [0x0F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
     ///                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
@@ -106,11 +105,15 @@ impl u252 {
 }
 
 impl TryFrom<&[u8]> for u252 {
-    type Error = Error;
+    type Error = ZcashdWalletError;
 
     fn try_from(bytes: &[u8]) -> std::result::Result<Self, Self::Error> {
         if bytes.len() != U252_SIZE {
-            return Err(anyhow::anyhow!("Invalid data length: expected 32, got {}", bytes.len()));
+            return Err(ZcashdWalletError::InvalidLength {
+                expected: U252_SIZE,
+                actual: bytes.len(),
+                type_name: "u252",
+            });
         }
         let mut a = [0u8; U252_SIZE];
         a.copy_from_slice(bytes);
@@ -119,15 +122,22 @@ impl TryFrom<&[u8]> for u252 {
 }
 
 impl TryFrom<&[u8; U252_SIZE]> for u252 {
-    type Error = Error;
+    type Error = ZcashdWalletError;
 
     fn try_from(bytes: &[u8; U252_SIZE]) -> std::result::Result<Self, Self::Error> {
+        // Validate the top 4 bits are zero
+        if (bytes[0] & 0xf0) != 0 {
+            return Err(ZcashdWalletError::InvalidData {
+                message: format!("u252 value has invalid top 4 bits: 0x{:02x}", bytes[0]),
+                type_name: "u252",
+            });
+        }
         Ok(Self(*bytes))
     }
 }
 
 impl TryFrom<&Vec<u8>> for u252 {
-    type Error = Error;
+    type Error = ZcashdWalletError;
 
     fn try_from(bytes: &Vec<u8>) -> std::result::Result<Self, Self::Error> {
         Self::try_from(bytes.as_slice())

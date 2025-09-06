@@ -1,7 +1,6 @@
-use anyhow::{Error, bail};
 use zewif::{Blob32, HexParseError};
 
-use crate::{parse, parser::prelude::*};
+use crate::{parse, parser::prelude::*, zcashd_wallet::error::ZcashdWalletError};
 
 pub const U256_SIZE: usize = 32;
 
@@ -64,11 +63,15 @@ impl u256 {
 }
 
 impl TryFrom<&[u8]> for u256 {
-    type Error = Error;
+    type Error = ZcashdWalletError;
 
     fn try_from(bytes: &[u8]) -> std::result::Result<Self, Self::Error> {
         if bytes.len() != U256_SIZE {
-            bail!("Invalid data length: expected 32, got {}", bytes.len());
+            return Err(ZcashdWalletError::InvalidLength {
+                expected: U256_SIZE,
+                actual: bytes.len(),
+                type_name: "u256",
+            });
         }
         let mut a = [0u8; U256_SIZE];
         a.copy_from_slice(bytes);
@@ -77,7 +80,7 @@ impl TryFrom<&[u8]> for u256 {
 }
 
 impl TryFrom<&[u8; U256_SIZE]> for u256 {
-    type Error = Error;
+    type Error = ZcashdWalletError;
 
     fn try_from(bytes: &[u8; U256_SIZE]) -> std::result::Result<Self, Self::Error> {
         Ok(Self(*bytes))
@@ -85,7 +88,7 @@ impl TryFrom<&[u8; U256_SIZE]> for u256 {
 }
 
 impl TryFrom<&Vec<u8>> for u256 {
-    type Error = Error;
+    type Error = ZcashdWalletError;
 
     fn try_from(bytes: &Vec<u8>) -> std::result::Result<Self, Self::Error> {
         Self::try_from(bytes.as_slice())

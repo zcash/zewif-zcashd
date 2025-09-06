@@ -15,7 +15,6 @@
 //!
 //! ```ignore
 //! use zewif_zcashd::parser::prelude::*;
-//! use anyhow::Result;
 //!
 //! struct MyType {}
 //!

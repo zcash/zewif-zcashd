@@ -25,7 +25,7 @@ use crate::{parse, parser::{prelude::*, error::{ParseError, InvalidDataKind}}};
 /// # Examples
 /// ```no_run
 /// # use zewif_zcashd::{zcashd_wallet::parse_compact_size, parser::prelude::*};
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// #
 /// # fn example() -> Result<()> {
 /// // Create a buffer with compact size data
@@ -117,7 +117,7 @@ pub fn parse_compact_size(p: &mut Parser) -> Result<usize> {
 /// # Examples
 /// ```no_run
 /// # use zewif_zcashd::{parse, parser::prelude::*, zcashd_wallet::CompactSize};
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// #
 /// # fn example() -> Result<()> {
 /// // Create a buffer with binary data

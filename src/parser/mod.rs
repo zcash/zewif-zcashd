@@ -29,7 +29,6 @@
 //! ```no_run
 //! use zewif::{TxId, Transaction};
 //! use zewif_zcashd::{parse, parser::prelude::*};
-//! use anyhow::Result;
 //!
 //! # fn example(data: &[u8]) -> Result<()> {
 //! let mut parser = Parser::new(&data);

@@ -24,7 +24,7 @@ use crate::parser::error::{ParseError, Result};
 ///
 /// # Examples
 /// ```no_run
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// # use zewif_zcashd::parser::{Parse, Parser};
 /// #
 /// // Implementing Parse for a custom type
@@ -91,7 +91,7 @@ pub trait Parse {
 /// # Examples
 /// ```no_run
 /// # use zewif_zcashd::parser::prelude::*;
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// #
 /// // A type that needs a parameter during parsing
 /// enum ProofType {
@@ -164,7 +164,7 @@ pub trait ParseWithParam<P> {
 /// # Examples
 /// ```no_run
 /// # use zewif_zcashd::parser::prelude::*;
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// #
 /// # fn example() -> Result<()> {
 /// // Create a parser from raw bytes
