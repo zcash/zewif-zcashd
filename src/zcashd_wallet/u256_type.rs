@@ -1,4 +1,4 @@
-use anyhow::{Error, Result, bail};
+use anyhow::{Error, bail};
 use zewif::{Blob32, HexParseError};
 
 use crate::{parse, parser::prelude::*};
@@ -51,7 +51,7 @@ impl u256 {
     /// // Parse the hash of the Zcash genesis block.
     /// let block_hash = u256::from_hex("00040fe8ec8471911baa1db1266ea15dd06b4a8a5c453883c000b031973dce08").unwrap();
     /// ```
-    pub fn from_hex(hex: &str) -> Result<Self, HexParseError> {
+    pub fn from_hex(hex: &str) -> std::result::Result<Self, HexParseError> {
         let blob = Blob32::from_hex(hex)?;
         let mut bytes = <[u8; U256_SIZE]>::from(blob);
         bytes.reverse();
@@ -66,7 +66,7 @@ impl u256 {
 impl TryFrom<&[u8]> for u256 {
     type Error = Error;
 
-    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+    fn try_from(bytes: &[u8]) -> std::result::Result<Self, Self::Error> {
         if bytes.len() != U256_SIZE {
             bail!("Invalid data length: expected 32, got {}", bytes.len());
         }
@@ -79,7 +79,7 @@ impl TryFrom<&[u8]> for u256 {
 impl TryFrom<&[u8; U256_SIZE]> for u256 {
     type Error = Error;
 
-    fn try_from(bytes: &[u8; U256_SIZE]) -> Result<Self, Self::Error> {
+    fn try_from(bytes: &[u8; U256_SIZE]) -> std::result::Result<Self, Self::Error> {
         Ok(Self(*bytes))
     }
 }
@@ -87,7 +87,7 @@ impl TryFrom<&[u8; U256_SIZE]> for u256 {
 impl TryFrom<&Vec<u8>> for u256 {
     type Error = Error;
 
-    fn try_from(bytes: &Vec<u8>) -> Result<Self, Self::Error> {
+    fn try_from(bytes: &Vec<u8>) -> std::result::Result<Self, Self::Error> {
         Self::try_from(bytes.as_slice())
     }
 }

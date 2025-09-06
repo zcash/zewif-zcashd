@@ -6,7 +6,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{Context, anyhow, bail};
+use anyhow::Context;
+use crate::parser::error::{ParseError, InvalidDataKind};
 use zcash_keys::keys::UnifiedFullViewingKey;
 use zewif::{Blob, Data, SeedFingerprint, sapling::SaplingIncomingViewingKey};
 
@@ -20,7 +21,7 @@ impl Parse for String {
     fn parse(p: &mut Parser) -> Result<Self> {
         let length = parse!(p, CompactSize, "string length")?;
         let bytes = parse!(p, bytes = *length, "string")?;
-        String::from_utf8(bytes.to_vec()).context("string")
+        String::from_utf8(bytes.to_vec()).map_err(Into::into)
     }
 }
 
@@ -34,7 +35,7 @@ where
         .try_into()
         .context("converting string length to usize")?;
     let bytes = parse!(p, bytes = length, "string data")?;
-    String::from_utf8(bytes.to_vec()).context("string")
+    String::from_utf8(bytes.to_vec()).map_err(Into::into)
 }
 
 impl Parse for bool {
@@ -43,7 +44,10 @@ impl Parse for bool {
         match byte {
             0 => Ok(false),
             1 => Ok(true),
-            _ => bail!("Invalid boolean value: {}", byte),
+            _ => Err(ParseError::InvalidData {
+                kind: InvalidDataKind::InvalidBooleanValue { value: byte },
+                context: Some("bool".to_string()),
+            }),
         }
     }
 }
@@ -256,7 +260,10 @@ pub fn parse_optional<T: Parse>(p: &mut Parser) -> Result<Option<T>> {
     match parse!(p, u8, "optional discriminant")? {
         0x00 => Ok(None),
         0x01 => Ok(Some(parse!(p, "optional value")?)),
-        discriminant => bail!("Invalid optional discriminant: 0x{:02x}", discriminant),
+        discriminant => Err(ParseError::InvalidData {
+            kind: InvalidDataKind::InvalidOptionalDiscriminant { value: discriminant },
+            context: Some("optional".to_string()),
+        }),
     }
 }
 
@@ -296,9 +303,13 @@ impl<const N: usize> Parse for zewif::Blob<N> {
         Self: Sized,
     {
         let data = parser
-            .next(N)
-            .with_context(|| format!("Parsing Blob<{}>", N))?;
-        Ok(Self::from_slice(data)?)
+            .next(N)?;
+        Self::from_slice(data).map_err(|_| ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: format!("Failed to create Blob<{}> from slice", N),
+            },
+            context: None,
+        })
     }
 }
 
@@ -336,7 +347,12 @@ impl Parse for zewif::Data {
 impl Parse for zewif::Amount {
     fn parse(p: &mut Parser) -> Result<Self> {
         let zat_balance = parse!(p, i64, "Zat balance")?;
-        Self::try_from(zat_balance).map_err(|_| anyhow!("Invalid Zat balance: {}", zat_balance))
+        Self::try_from(zat_balance).map_err(|_| ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: format!("Invalid Zat balance: {}", zat_balance),
+            },
+            context: None,
+        })
     }
 }
 
@@ -364,7 +380,7 @@ impl Parse for zewif::BlockHash {
 impl Parse for zewif::MnemonicLanguage {
     fn parse(p: &mut Parser) -> Result<Self> {
         let value = parse!(p, "language value")?;
-        zewif::MnemonicLanguage::from_u32(value)
+        zewif::MnemonicLanguage::from_u32(value).map_err(Into::into)
     }
 }
 
@@ -443,8 +459,18 @@ impl Parse for UnifiedFullViewingKey {
         use zcash_address::unified::Encoding;
 
         let ufvk_str: String = parse!(p, "ufvk string")?;
-        let (_, ufvk) = zcash_address::unified::Ufvk::decode(&ufvk_str)?;
-        Ok(Self::parse(&ufvk)?)
+        let (_, ufvk) = zcash_address::unified::Ufvk::decode(&ufvk_str).map_err(|e| ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: format!("Failed to decode UFVK: {}", e),
+            },
+            context: None,
+        })?;
+        Self::parse(&ufvk).map_err(|e| ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: format!("Failed to parse UFVK: {}", e),
+            },
+            context: None,
+        })
     }
 }
 
@@ -453,6 +479,11 @@ impl Parse for ::orchard::keys::IncomingViewingKey {
         let bytes: Blob<64> = parse!(p, "orchard IVK")?;
         ::orchard::keys::IncomingViewingKey::from_bytes(bytes.as_bytes())
             .into_option()
-            .ok_or(anyhow::anyhow!("Not a valid Orchard incoming viewing key"))
+            .ok_or_else(|| ParseError::InvalidData {
+                kind: InvalidDataKind::Other {
+                    message: "Not a valid Orchard incoming viewing key".to_string(),
+                },
+                context: None,
+            })
     }
 }

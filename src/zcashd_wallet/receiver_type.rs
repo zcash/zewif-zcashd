@@ -25,7 +25,13 @@ impl Parse for ReceiverType {
             0x01 => Ok(ReceiverType::P2SH),
             0x02 => Ok(ReceiverType::Sapling),
             0x03 => Ok(ReceiverType::Orchard),
-            _ => Err(anyhow::anyhow!("Invalid ReceiverType byte: 0x{:02x}", byte)),
+            _ => Err(ParseError::InvalidData {
+                kind: InvalidDataKind::InvalidEnumValue {
+                    enum_name: "ReceiverType",
+                    value: byte as u8,
+                },
+                context: Some("ReceiverType".to_string()),
+            }),
         }
     }
 }

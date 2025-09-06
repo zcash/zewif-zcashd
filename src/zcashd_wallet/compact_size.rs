@@ -1,6 +1,4 @@
-use anyhow::bail;
-
-use crate::{parse, parser::prelude::*};
+use crate::{parse, parser::{prelude::*, error::{ParseError, InvalidDataKind}}};
 
 /// Parses a Bitcoin-style variable-length integer (compact size) from a binary data stream.
 ///
@@ -48,27 +46,42 @@ pub fn parse_compact_size(p: &mut Parser) -> Result<usize> {
         0xfd => {
             let n = parse!(p, u16, "compact size")?;
             if n < 253 {
-                bail!("Compact size with 0xfd prefix must be >= 253, got {}", n);
+                return Err(ParseError::InvalidData {
+                    kind: InvalidDataKind::InvalidCompactSize {
+                        prefix: 0xfd,
+                        value: n as u64,
+                        minimum: 253,
+                    },
+                    context: None,
+                });
             }
             Ok(n as usize)
         }
         0xfe => {
             let n = parse!(p, u32, "compact size")?;
             if n < 0x10000 {
-                bail!(
-                    "Compact size with 0xfe prefix must be >= 0x10000, got {}",
-                    n
-                );
+                return Err(ParseError::InvalidData {
+                    kind: InvalidDataKind::InvalidCompactSize {
+                        prefix: 0xfe,
+                        value: n as u64,
+                        minimum: 0x10000,
+                    },
+                    context: None,
+                });
             }
             Ok(n as usize)
         }
         0xff => {
             let n = parse!(p, u64, "compact size")?;
             if n < 0x100000000 {
-                bail!(
-                    "Compact size with 0xff prefix must be >= 0x100000000, got {}",
-                    n
-                );
+                return Err(ParseError::InvalidData {
+                    kind: InvalidDataKind::InvalidCompactSize {
+                        prefix: 0xff,
+                        value: n,
+                        minimum: 0x100000000,
+                    },
+                    context: None,
+                });
             }
             Ok(n as usize)
         }

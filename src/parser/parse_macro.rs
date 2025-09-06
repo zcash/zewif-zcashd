@@ -37,13 +37,13 @@
 /// Parse a type that implements `ParseWithParam` and needs additional parameters:
 /// ```no_run
 /// # use zewif_zcashd::{parser::prelude::*, parse};
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// #
 /// # // Define a dummy type that implements ParseWithParam for the example
 /// # struct SomeType;
 /// # impl ParseWithParam<u32> for SomeType {
-/// #     fn parse(_parser: &mut Parser, _param: u32) -> Result<Self> { Ok(SomeType) }
-/// #     fn parse_buf(_buf: &dyn AsRef<[u8]>, _param: u32, _trace: bool) -> Result<Self> { Ok(SomeType) }
+/// #     fn parse(_parser: &mut Parser, _param: u32) -> zewif_zcashd::parser::error::Result<Self> { Ok(SomeType) }
+/// #     fn parse_buf(_buf: &dyn AsRef<[u8]>, _param: u32, _trace: bool) -> zewif_zcashd::parser::error::Result<Self> { Ok(SomeType) }
 /// # }
 /// #
 /// # fn example(parser: &mut Parser, param: u32) -> Result<()> {

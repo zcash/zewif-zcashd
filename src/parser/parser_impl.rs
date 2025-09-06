@@ -34,7 +34,7 @@ use crate::parser::error::{ParseError, Result};
 /// }
 ///
 /// impl Parse for MyType {
-///     fn parse(p: &mut Parser) -> Result<Self> {
+///     fn parse(p: &mut Parser) -> zewif_zcashd::parser::error::Result<Self> {
 ///         let value = u32::parse(p)?;
 ///         let name = String::parse(p)?;
 ///         Ok(Self { value, name })
@@ -100,7 +100,7 @@ pub trait Parse {
 /// }
 ///
 /// impl ParseWithParam<bool> for ProofType {
-///     fn parse(p: &mut Parser, use_type_a: bool) -> Result<Self> {
+///     fn parse(p: &mut Parser, use_type_a: bool) -> zewif_zcashd::parser::error::Result<Self> {
 ///         if use_type_a {
 ///             Ok(Self::TypeA(u32::parse(p)?))
 ///         } else {

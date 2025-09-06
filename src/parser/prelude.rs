@@ -31,7 +31,7 @@
 //! `std::prelude`) of providing the most commonly needed imports in a single module.
 
 #[doc(hidden)]
-pub use super::error::{ParseError, Result, ResultExt};
+pub use super::error::{InvalidDataKind, ParseError, Result, ResultExt};
 #[doc(hidden)]
 pub use super::parser_impl::{Parse, ParseWithParam, Parser};
 #[doc(hidden)]

@@ -1,5 +1,5 @@
 use crate::{parse, parser::prelude::*};
-use anyhow::{Error, bail};
+use anyhow::Error;
 use zewif::Blob32;
 
 pub const U252_SIZE: usize = 32;
@@ -29,7 +29,7 @@ pub const U252_SIZE: usize = 32;
 /// # use zewif::Blob32;
 /// # use zewif_zcashd::zcashd_wallet::u252;
 /// # 
-/// # fn example() -> Result<()> {
+/// # fn example() -> anyhow::Result<()> {
 /// // Create a blob with the top 4 bits set to zero
 /// let mut data = [0u8; 32];
 /// data[0] = 0x0F; // Only using the bottom 4 bits of the first byte
@@ -55,7 +55,7 @@ impl u252 {
     /// # use zewif::Blob32;
     /// # use zewif_zcashd::zcashd_wallet::u252;
     /// # 
-    /// # fn example() -> Result<()> {
+    /// # fn example() -> anyhow::Result<()> {
     /// // Valid u252 (MSB has top 4 bits = 0)
     /// let valid_bytes = [0x0F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
     ///                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
@@ -82,10 +82,22 @@ impl u252 {
 
     pub fn from_slice(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != U252_SIZE {
-            bail!("Invalid data length: expected 32, got {}", bytes.len());
+            return Err(ParseError::InvalidData {
+                kind: InvalidDataKind::LengthInvalid {
+                    expected: U252_SIZE,
+                    actual: bytes.len(),
+                },
+                context: Some("u252".to_string()),
+            });
         }
         if (bytes[0] & 0xf0) != 0 {
-            bail!("First four bits of u252 must be zero");
+            return Err(ParseError::InvalidData {
+                kind: InvalidDataKind::InvalidBitPattern {
+                    description: "u252 (first four bits must be zero)",
+                    value: bytes[0],
+                },
+                context: Some("u252".to_string()),
+            });
         }
         let mut a = [0u8; U252_SIZE];
         a.copy_from_slice(bytes);
@@ -98,7 +110,7 @@ impl TryFrom<&[u8]> for u252 {
 
     fn try_from(bytes: &[u8]) -> std::result::Result<Self, Self::Error> {
         if bytes.len() != U252_SIZE {
-            bail!("Invalid data length: expected 32, got {}", bytes.len());
+            return Err(anyhow::anyhow!("Invalid data length: expected 32, got {}", bytes.len()));
         }
         let mut a = [0u8; U252_SIZE];
         a.copy_from_slice(bytes);
