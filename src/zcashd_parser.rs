@@ -264,14 +264,14 @@ impl<'a> ZcashdParser<'a> {
         }
         let mut keys_map = HashMap::new();
         for (key, value) in key_records {
-            let pubkey = parse!(buf = &key.data, PubKey, "pubkey").map_err(anyhow::Error::from)?;
-            let privkey = parse!(buf = value.as_data(), PrivKey, "privkey").map_err(anyhow::Error::from)?;
+            let pubkey = parse!(buf = &key.data, PubKey, "pubkey")?;
+            let privkey = parse!(buf = value.as_data(), PrivKey, "privkey")?;
             let metakey = DBKey::new("keymeta", &key.data);
             let metadata_binary = self
                 .dump
                 .value_for_key(&metakey)
                 .context("Getting metadata")?;
-            let metadata = parse!(buf = metadata_binary, KeyMetadata, "metadata").map_err(anyhow::Error::from)?;
+            let metadata = parse!(buf = metadata_binary, KeyMetadata, "metadata")?;
             let keypair = KeyPair::new(pubkey.clone(), privkey.clone(), metadata)
                 .context("Creating keypair")?;
             keys_map.insert(pubkey, keypair);
@@ -295,12 +295,12 @@ impl<'a> ZcashdParser<'a> {
         }
         let mut keys_map = HashMap::new();
         for (key, value) in key_records {
-            let pubkey = parse!(buf = &key.data, PubKey, "pubkey").map_err(anyhow::Error::from)?;
+            let pubkey = parse!(buf = &key.data, PubKey, "pubkey")?;
             let mut parser = Parser::new(value.as_data());
-            let privkey = parse!(&mut parser, PrivKey, "privkey").map_err(anyhow::Error::from)?;
-            let time_created = parse!(&mut parser, SecondsSinceEpoch, "time_created").map_err(anyhow::Error::from)?;
-            let time_expires = parse!(&mut parser, SecondsSinceEpoch, "time_expires").map_err(anyhow::Error::from)?;
-            let comment = parse!(&mut parser, String, "comment").map_err(anyhow::Error::from)?;
+            let privkey = parse!(&mut parser, PrivKey, "privkey")?;
+            let time_created = parse!(&mut parser, SecondsSinceEpoch, "time_created")?;
+            let time_expires = parse!(&mut parser, SecondsSinceEpoch, "time_expires")?;
+            let comment = parse!(&mut parser, String, "comment")?;
             let wallet_key = WalletKey::new(
                 pubkey.clone(),
                 privkey.clone(),
@@ -340,18 +340,18 @@ impl<'a> ZcashdParser<'a> {
             }.into());
         }
         for (key, value) in key_records {
-            let ivk = parse!(buf = &key.data, SaplingIncomingViewingKey, "ivk").map_err(anyhow::Error::from)?;
+            let ivk = parse!(buf = &key.data, SaplingIncomingViewingKey, "ivk")?;
             let spending_key = parse!(
                 buf = value.as_data(),
                 ::sapling::zip32::ExtendedSpendingKey,
                 "spending_key"
-            ).map_err(anyhow::Error::from)?;
+            )?;
             let metakey = DBKey::new("sapzkeymeta", &key.data);
             let metadata_binary = self
                 .dump
                 .value_for_key(&metakey)
                 .context("Getting sapzkeymeta metadata")?;
-            let metadata = parse!(buf = metadata_binary, KeyMetadata, "sapzkeymeta metadata").map_err(anyhow::Error::from)?;
+            let metadata = parse!(buf = metadata_binary, KeyMetadata, "sapzkeymeta metadata")?;
             let keypair =
                 SaplingKey::new(ivk, spending_key.clone(), metadata);
             keys_map.insert(ivk, keypair);
@@ -387,14 +387,14 @@ impl<'a> ZcashdParser<'a> {
         }
         let mut zkeys_map = HashMap::new();
         for (key, value) in zkey_records {
-            let payment_address = parse!(buf = &key.data, SproutPaymentAddress, "payment_address").map_err(anyhow::Error::from)?;
-            let spending_key = parse!(buf = value.as_data(), u252, "spending_key").map_err(anyhow::Error::from)?;
+            let payment_address = parse!(buf = &key.data, SproutPaymentAddress, "payment_address")?;
+            let spending_key = parse!(buf = value.as_data(), u252, "spending_key")?;
             let metakey = DBKey::new("zkeymeta", &key.data);
             let metadata_binary = self
                 .dump
                 .value_for_key(&metakey)
                 .context("Getting metadata")?;
-            let metadata = parse!(buf = metadata_binary, KeyMetadata, "metadata").map_err(anyhow::Error::from)?;
+            let metadata = parse!(buf = metadata_binary, KeyMetadata, "metadata")?;
             let keypair = SproutSpendingKey::new(spending_key, metadata);
             zkeys_map.insert(payment_address, keypair);
 
@@ -425,10 +425,10 @@ impl<'a> ZcashdParser<'a> {
             .context("Getting 'recipientmapping' records")?;
         for (key, value) in records {
             let mut p = Parser::new(&key.data);
-            let txid = parse!(&mut p, TxId, "txid").map_err(anyhow::Error::from)?;
-            let recipient_address = parse!(&mut p, RecipientAddress, "recipient_address").map_err(anyhow::Error::from)?;
+            let txid = parse!(&mut p, TxId, "txid")?;
+            let recipient_address = parse!(&mut p, RecipientAddress, "recipient_address")?;
             p.check_finished()?;
-            let unified_address = parse!(buf = &value, String, "unified_address").map_err(anyhow::Error::from)?;
+            let unified_address = parse!(buf = &value, String, "unified_address")?;
             let recipient_mapping = RecipientMapping::new(recipient_address, unified_address);
             send_recipients
                 .entry(txid)
@@ -451,9 +451,9 @@ impl<'a> ZcashdParser<'a> {
                 buf = &key.data,
                 UnifiedAddressMetadata,
                 "UnifiedAddressMetadata key"
-            ).map_err(anyhow::Error::from)?;
+            )?;
             address_metadata.push(metadata);
-            let v: u32 = parse!(buf = value.as_data(), u32, "UnifiedAddressMetadata value").map_err(anyhow::Error::from)?;
+            let v: u32 = parse!(buf = value.as_data(), u32, "UnifiedAddressMetadata value")?;
             if v != 0 {
                 return Err(ParseError::InvalidData {
                     kind: InvalidDataKind::UnexpectedUnifiedMetadataValue {
@@ -474,9 +474,9 @@ impl<'a> ZcashdParser<'a> {
                 buf = &key.data,
                 UnifiedAccountMetadata,
                 "UnifiedAccountMetadata key"
-            ).map_err(anyhow::Error::from)?;
+            )?;
             account_metadata.insert(*metadata.ufvk_fingerprint(), metadata);
-            let v: u32 = parse!(buf = value.as_data(), u32, "UnifiedAccountMetadata value").map_err(anyhow::Error::from)?;
+            let v: u32 = parse!(buf = value.as_data(), u32, "UnifiedAccountMetadata value")?;
             if v != 0 {
                 return Err(ParseError::InvalidData {
                     kind: InvalidDataKind::UnexpectedUnifiedMetadataValue {
@@ -497,12 +497,12 @@ impl<'a> ZcashdParser<'a> {
                 buf = &key.data,
                 UfvkFingerprint,
                 "UnifiedFullViewingKey key"
-            ).map_err(anyhow::Error::from)?;
+            )?;
             let fvk = parse!(
                 buf = value.as_data(),
                 UnifiedFullViewingKey,
                 "UnifiedFullViewingKey value"
-            ).map_err(anyhow::Error::from)?;
+            )?;
             full_viewing_keys.insert(key_id, fvk);
             self.mark_key_parsed(&key);
         }
@@ -520,8 +520,8 @@ impl<'a> ZcashdParser<'a> {
                 .dump
                 .record_for_keyname("hdseed")
                 .context("Getting 'hdseed' record")?;
-            let fingerprint = parse!(buf = &key.data, SeedFingerprint, "seed fingerprint").map_err(anyhow::Error::from)?;
-            let seed_data = parse!(buf = &value, Data, "legacy seed data").map_err(anyhow::Error::from)?;
+            let fingerprint = parse!(buf = &key.data, SeedFingerprint, "seed fingerprint")?;
+            let seed_data = parse!(buf = &value, Data, "legacy seed data")?;
             self.mark_key_parsed(&key);
             Some(LegacySeed::new(seed_data, Some(fingerprint)))
         } else {
@@ -534,8 +534,8 @@ impl<'a> ZcashdParser<'a> {
             .dump
             .record_for_keyname("mnemonicphrase")
             .context("Getting 'mnemonicphrase' record")?;
-        let fingerprint = parse!(buf = &key.data, SeedFingerprint, "seed fingerprint").map_err(anyhow::Error::from)?;
-        let mut bip39_mnemonic = parse!(buf = &value, Bip39Mnemonic, "mnemonic phrase").map_err(anyhow::Error::from)?;
+        let fingerprint = parse!(buf = &key.data, SeedFingerprint, "seed fingerprint")?;
+        let mut bip39_mnemonic = parse!(buf = &value, Bip39Mnemonic, "mnemonic phrase")?;
         bip39_mnemonic.set_fingerprint(fingerprint);
         self.mark_key_parsed(&key);
         Ok(bip39_mnemonic)
@@ -548,8 +548,8 @@ impl<'a> ZcashdParser<'a> {
             .context("Getting 'name' records")?;
         let mut address_names = HashMap::new();
         for (key, value) in records {
-            let address = parse!(buf = &key.data, Address, "address").map_err(anyhow::Error::from)?;
-            let name = parse!(buf = value.as_data(), String, "name").map_err(anyhow::Error::from)?;
+            let address = parse!(buf = &key.data, Address, "address")?;
+            let name = parse!(buf = value.as_data(), String, "name")?;
             if address_names.contains_key(&address) {
                 return Err(ParseError::InvalidData {
                     kind: InvalidDataKind::DuplicateEntry {
@@ -573,8 +573,8 @@ impl<'a> ZcashdParser<'a> {
             .context("Getting 'purpose' records")?;
         let mut address_purposes = HashMap::new();
         for (key, value) in records {
-            let address = parse!(buf = &key.data, Address, "address").map_err(anyhow::Error::from)?;
-            let purpose = parse!(buf = value.as_data(), String, "purpose").map_err(anyhow::Error::from)?;
+            let address = parse!(buf = &key.data, Address, "address")?;
+            let purpose = parse!(buf = value.as_data(), String, "purpose")?;
             if address_purposes.contains_key(&address) {
                 return Err(ParseError::InvalidData {
                     kind: InvalidDataKind::DuplicateEntry {
@@ -604,12 +604,12 @@ impl<'a> ZcashdParser<'a> {
             .context("Getting 'sapzaddr' records")?;
         for (key, value) in records {
             let payment_address =
-                parse!(buf = &key.data, SaplingZPaymentAddress, "payment address").map_err(anyhow::Error::from)?;
+                parse!(buf = &key.data, SaplingZPaymentAddress, "payment address")?;
             let viewing_key = parse!(
                 buf = value.as_data(),
                 SaplingIncomingViewingKey,
                 "viewing key"
-            ).map_err(anyhow::Error::from)?;
+            )?;
             if sapling_z_addresses.contains_key(&payment_address) {
                 return Err(ParseError::InvalidData {
                     kind: InvalidDataKind::DuplicateEntry {
@@ -630,7 +630,7 @@ impl<'a> ZcashdParser<'a> {
         let value = self
             .value_for_keyname("networkinfo")
             .context("Getting 'networkinfo' record")?;
-        let network_info = parse!(buf = value.as_data(), NetworkInfo, "network info").map_err(anyhow::Error::from)?;
+        let network_info = parse!(buf = value.as_data(), NetworkInfo, "network info")?;
         Ok(network_info)
     }
 
@@ -642,7 +642,7 @@ impl<'a> ZcashdParser<'a> {
             buf = &&value.as_data()[4..],
             OrchardNoteCommitmentTree,
             "orchard note commitment tree"
-        ).map_err(anyhow::Error::from)?;
+        )?;
         Ok(orchard_note_commitment_tree)
     }
 
@@ -653,8 +653,8 @@ impl<'a> ZcashdParser<'a> {
             .context("Getting 'pool' records")?;
         let mut key_pool = HashMap::new();
         for (key, value) in records {
-            let index = parse!(buf = &key.data, i64, "key pool index").map_err(anyhow::Error::from)?;
-            let entry = parse!(buf = value.as_data(), KeyPoolEntry, "key pool entry").map_err(anyhow::Error::from)?;
+            let index = parse!(buf = &key.data, i64, "key pool index")?;
+            let entry = parse!(buf = value.as_data(), KeyPoolEntry, "key pool entry")?;
             key_pool.insert(index, entry);
 
             self.mark_key_parsed(&key);
@@ -673,9 +673,9 @@ impl<'a> ZcashdParser<'a> {
             let mut sorted_records: Vec<_> = records.into_iter().collect();
             sorted_records.sort_by(|(key1, _), (key2, _)| key1.data.cmp(&key2.data));
             for (key, value) in sorted_records {
-                let txid = parse!(buf = &key.data, TxId, "transaction ID").map_err(anyhow::Error::from)?;
+                let txid = parse!(buf = &key.data, TxId, "transaction ID")?;
                 let trace = false;
-                match parse!(buf = value.as_data(), WalletTx, "transaction", trace).map_err(anyhow::Error::from) {
+                match parse!(buf = value.as_data(), WalletTx, "transaction", trace) {
                     Ok(transaction) => {
                         if transactions.contains_key(&txid) {
                             return Err(ParseError::InvalidData {
