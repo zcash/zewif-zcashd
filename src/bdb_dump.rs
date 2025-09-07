@@ -4,8 +4,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use anyhow::{Result, anyhow, bail};
-
+use crate::parser::prelude::*;
 use zewif::Data;
 
 pub struct BDBDump {
@@ -21,15 +20,25 @@ impl BDBDump {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
-            .map_err(|e| anyhow!("Error executing db_dump against path {}: {}", filepath.to_string_lossy(), e))?;
+            .map_err(|e| ParseError::InvalidData {
+                kind: InvalidDataKind::Other {
+                    message: format!("Error executing db_dump against path {}: {}", filepath.to_string_lossy(), e),
+                },
+                context: None,
+            })?;
 
         // Check if db_dump executed successfully
         if !output.status.success() {
-            bail!(
-                "db_dump failed with status: {}\nError: {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            );
+            return Err(ParseError::InvalidData {
+                kind: InvalidDataKind::Other {
+                    message: format!(
+                        "db_dump failed with status: {}\nError: {}",
+                        output.status,
+                        String::from_utf8_lossy(&output.stderr)
+                    ),
+                },
+                context: None,
+            });
         }
 
         // Convert the stdout to a string for parsing
@@ -92,11 +101,21 @@ impl BDBDump {
 
         // Check if there was an unmatched key without a corresponding value
         if current_key.is_some() {
-            bail!("Warning: Found a key without a corresponding value.");
+            return Err(ParseError::InvalidData {
+                kind: InvalidDataKind::Other {
+                    message: "Warning: Found a key without a corresponding value.".to_string(),
+                },
+                context: None,
+            });
         }
 
         if records_count != data_records.len() {
-            bail!("Warning: Non-uniqueness in keys detected.");
+            return Err(ParseError::InvalidData {
+                kind: InvalidDataKind::Other {
+                    message: "Warning: Non-uniqueness in keys detected.".to_string(),
+                },
+                context: None,
+            });
         }
 
         Ok(BDBDump { header_records, data_records })

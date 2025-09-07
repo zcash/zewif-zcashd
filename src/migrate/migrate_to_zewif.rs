@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::Result;
+use crate::parser::prelude::*;
 
 use crate::{ZcashdWallet, zcashd_wallet::UfvkFingerprint};
 

@@ -97,6 +97,18 @@ pub enum InvalidDataKind {
         entry_type: DuplicateEntryType,
         key: String,
     },
+    // Database dump parsing errors
+    KeyNotFound {
+        key: String,
+    },
+    KeynameNotFound {
+        keyname: String,
+    },
+    RecordCountError {
+        keyname: String,
+        expected: String, // "exactly one", "at least one", etc.
+        actual: usize,
+    },
     Other {
         message: String,
     },
@@ -239,6 +251,15 @@ impl fmt::Display for InvalidDataKind {
             InvalidDataKind::DuplicateEntry { entry_type, key } => {
                 write!(f, "Duplicate {} found: {}", entry_type, key)
             }
+            InvalidDataKind::KeyNotFound { key } => {
+                write!(f, "No record found for key: {}", key)
+            }
+            InvalidDataKind::KeynameNotFound { keyname } => {
+                write!(f, "No record found for keyname: {}", keyname)
+            }
+            InvalidDataKind::RecordCountError { keyname, expected, actual } => {
+                write!(f, "Expected {} record(s) for keyname: {}, got {}", expected, keyname, actual)
+            }
             InvalidDataKind::Other { message } => {
                 write!(f, "{}", message)
             }
@@ -283,6 +304,39 @@ impl From<std::string::FromUtf8Error> for ParseError {
     fn from(err: std::string::FromUtf8Error) -> Self {
         ParseError::InvalidData {
             kind: InvalidDataKind::Utf8Error { error: err },
+            context: None,
+        }
+    }
+}
+
+impl From<zcash_address::ParseError> for ParseError {
+    fn from(err: zcash_address::ParseError) -> Self {
+        ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: format!("Address parse error: {}", err),
+            },
+            context: None,
+        }
+    }
+}
+
+impl From<zcash_address::ConversionError<std::convert::Infallible>> for ParseError {
+    fn from(err: zcash_address::ConversionError<std::convert::Infallible>) -> Self {
+        ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: format!("Address conversion error: {}", err),
+            },
+            context: None,
+        }
+    }
+}
+
+impl From<zcash_keys::keys::AddressGenerationError> for ParseError {
+    fn from(err: zcash_keys::keys::AddressGenerationError) -> Self {
+        ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: format!("Address generation error: {}", err),
+            },
             context: None,
         }
     }

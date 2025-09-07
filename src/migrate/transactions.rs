@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::parser::prelude::*;
 use std::collections::HashMap;
 use zewif::{BlockHash, TxBlockPosition, TxId};
 
@@ -10,7 +10,7 @@ pub fn convert_transactions(wallet: &ZcashdWallet) -> Result<HashMap<TxId, zewif
 
     for (tx_id, wallet_tx) in wallet.transactions() {
         let zewif_tx = convert_transaction(*tx_id, wallet_tx)
-            .with_context(|| format!("Failed to convert transaction {}", tx_id))?;
+            .with_context(format!("Failed to convert transaction {}", tx_id))?;
         transactions.insert(*tx_id, zewif_tx);
     }
 

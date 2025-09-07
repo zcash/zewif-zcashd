@@ -53,10 +53,10 @@ impl<'a> ZcashdParser<'a> {
         self.unparsed_keys.borrow_mut().remove(key);
     }
 
-    fn value_for_keyname(&self, keyname: &str) -> Result<&DBValue> {
+    fn value_for_keyname(&self, keyname: &str) -> anyhow::Result<&DBValue> {
         let key = self.dump.key_for_keyname(keyname);
         self.mark_key_parsed(&key);
-        self.dump.value_for_keyname(keyname)
+        self.dump.value_for_keyname(keyname).map_err(|e| e.into())
     }
 
     fn parse(&self) -> Result<(ZcashdWallet, HashSet<DBKey>)> {
