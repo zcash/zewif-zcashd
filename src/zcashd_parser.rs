@@ -1,4 +1,3 @@
-use anyhow::Context;
 use crate::parser::error::ParseError;
 use hex::ToHex as _;
 use std::{
@@ -246,11 +245,11 @@ impl<'a> ZcashdParser<'a> {
         let key_records = self
             .dump
             .records_for_keyname("key")
-            .context("Getting 'key' records")?;
+            .with_context("Getting 'key' records")?;
         let keymeta_records = self
             .dump
             .records_for_keyname("keymeta")
-            .context("Getting 'keymeta' records")?;
+            .with_context("Getting 'keymeta' records")?;
         if key_records.len() != keymeta_records.len() {
             return Err(ParseError::InvalidData {
                 kind: InvalidDataKind::RecordCountMismatch {
@@ -270,10 +269,15 @@ impl<'a> ZcashdParser<'a> {
             let metadata_binary = self
                 .dump
                 .value_for_key(&metakey)
-                .context("Getting metadata")?;
+                .with_context("Getting metadata")?;
             let metadata = parse!(buf = metadata_binary, KeyMetadata, "metadata")?;
             let keypair = KeyPair::new(pubkey.clone(), privkey.clone(), metadata)
-                .context("Creating keypair")?;
+                .map_err(|e| ParseError::InvalidData {
+                    kind: InvalidDataKind::Other {
+                        message: e.to_string(),
+                    },
+                    context: Some("Creating keypair".to_string()),
+                })?;
             keys_map.insert(pubkey, keypair);
 
             self.mark_key_parsed(&key);
@@ -289,7 +293,7 @@ impl<'a> ZcashdParser<'a> {
         let key_records = self
             .dump
             .records_for_keyname("wkey")
-            .context("Getting 'wkey' records")?;
+            .with_context("Getting 'wkey' records")?;
         if key_records.is_empty() {
             return Ok(None);
         }
@@ -323,11 +327,11 @@ impl<'a> ZcashdParser<'a> {
         let key_records = self
             .dump
             .records_for_keyname("sapzkey")
-            .context("Getting 'sapzkey' records")?;
+            .with_context("Getting 'sapzkey' records")?;
         let keymeta_records = self
             .dump
             .records_for_keyname("sapzkeymeta")
-            .context("Getting 'sapzkeymeta' records")?;
+            .with_context("Getting 'sapzkeymeta' records")?;
         if key_records.len() != keymeta_records.len() {
             return Err(ParseError::InvalidData {
                 kind: InvalidDataKind::RecordCountMismatch {
@@ -350,7 +354,7 @@ impl<'a> ZcashdParser<'a> {
             let metadata_binary = self
                 .dump
                 .value_for_key(&metakey)
-                .context("Getting sapzkeymeta metadata")?;
+                .with_context("Getting sapzkeymeta metadata")?;
             let metadata = parse!(buf = metadata_binary, KeyMetadata, "sapzkeymeta metadata")?;
             let keypair =
                 SaplingKey::new(ivk, spending_key.clone(), metadata);
@@ -369,11 +373,11 @@ impl<'a> ZcashdParser<'a> {
         let zkey_records = self
             .dump
             .records_for_keyname("zkey")
-            .context("Getting 'zkey' records")?;
+            .with_context("Getting 'zkey' records")?;
         let zkeymeta_records = self
             .dump
             .records_for_keyname("zkeymeta")
-            .context("Getting 'zkeymeta' records")?;
+            .with_context("Getting 'zkeymeta' records")?;
         if zkey_records.len() != zkeymeta_records.len() {
             return Err(ParseError::InvalidData {
                 kind: InvalidDataKind::RecordCountMismatch {
@@ -393,7 +397,7 @@ impl<'a> ZcashdParser<'a> {
             let metadata_binary = self
                 .dump
                 .value_for_key(&metakey)
-                .context("Getting metadata")?;
+                .with_context("Getting metadata")?;
             let metadata = parse!(buf = metadata_binary, KeyMetadata, "metadata")?;
             let keypair = SproutSpendingKey::new(spending_key, metadata);
             zkeys_map.insert(payment_address, keypair);
@@ -422,7 +426,7 @@ impl<'a> ZcashdParser<'a> {
         let records = self
             .dump
             .records_for_keyname("recipientmapping")
-            .context("Getting 'recipientmapping' records")?;
+            .with_context("Getting 'recipientmapping' records")?;
         for (key, value) in records {
             let mut p = Parser::new(&key.data);
             let txid = parse!(&mut p, TxId, "txid")?;
@@ -519,7 +523,7 @@ impl<'a> ZcashdParser<'a> {
             let (key, value) = self
                 .dump
                 .record_for_keyname("hdseed")
-                .context("Getting 'hdseed' record")?;
+                .with_context("Getting 'hdseed' record")?;
             let fingerprint = parse!(buf = &key.data, SeedFingerprint, "seed fingerprint")?;
             let seed_data = parse!(buf = &value, Data, "legacy seed data")?;
             self.mark_key_parsed(&key);
@@ -533,7 +537,7 @@ impl<'a> ZcashdParser<'a> {
         let (key, value) = self
             .dump
             .record_for_keyname("mnemonicphrase")
-            .context("Getting 'mnemonicphrase' record")?;
+            .with_context("Getting 'mnemonicphrase' record")?;
         let fingerprint = parse!(buf = &key.data, SeedFingerprint, "seed fingerprint")?;
         let mut bip39_mnemonic = parse!(buf = &value, Bip39Mnemonic, "mnemonic phrase")?;
         bip39_mnemonic.set_fingerprint(fingerprint);
@@ -545,7 +549,7 @@ impl<'a> ZcashdParser<'a> {
         let records = self
             .dump
             .records_for_keyname("name")
-            .context("Getting 'name' records")?;
+            .with_context("Getting 'name' records")?;
         let mut address_names = HashMap::new();
         for (key, value) in records {
             let address = parse!(buf = &key.data, Address, "address")?;
@@ -570,7 +574,7 @@ impl<'a> ZcashdParser<'a> {
         let records = self
             .dump
             .records_for_keyname("purpose")
-            .context("Getting 'purpose' records")?;
+            .with_context("Getting 'purpose' records")?;
         let mut address_purposes = HashMap::new();
         for (key, value) in records {
             let address = parse!(buf = &key.data, Address, "address")?;
@@ -601,7 +605,7 @@ impl<'a> ZcashdParser<'a> {
         let records = self
             .dump
             .records_for_keyname("sapzaddr")
-            .context("Getting 'sapzaddr' records")?;
+            .with_context("Getting 'sapzaddr' records")?;
         for (key, value) in records {
             let payment_address =
                 parse!(buf = &key.data, SaplingZPaymentAddress, "payment address")?;
@@ -629,7 +633,7 @@ impl<'a> ZcashdParser<'a> {
     fn parse_network_info(&self) -> Result<NetworkInfo> {
         let value = self
             .value_for_keyname("networkinfo")
-            .context("Getting 'networkinfo' record")?;
+            .with_context("Getting 'networkinfo' record")?;
         let network_info = parse!(buf = value.as_data(), NetworkInfo, "network info")?;
         Ok(network_info)
     }
@@ -637,7 +641,7 @@ impl<'a> ZcashdParser<'a> {
     fn parse_orchard_note_commitment_tree(&self) -> Result<OrchardNoteCommitmentTree> {
         let value = self
             .value_for_keyname("orchard_note_commitment_tree")
-            .context("Getting 'orchard_note_commitment_tree' record")?;
+            .with_context("Getting 'orchard_note_commitment_tree' record")?;
         let orchard_note_commitment_tree = parse!(
             buf = &&value.as_data()[4..],
             OrchardNoteCommitmentTree,
@@ -650,7 +654,7 @@ impl<'a> ZcashdParser<'a> {
         let records = self
             .dump
             .records_for_keyname("pool")
-            .context("Getting 'pool' records")?;
+            .with_context("Getting 'pool' records")?;
         let mut key_pool = HashMap::new();
         for (key, value) in records {
             let index = parse!(buf = &key.data, i64, "key pool index")?;
@@ -669,7 +673,7 @@ impl<'a> ZcashdParser<'a> {
             let records = self
                 .dump
                 .records_for_keyname("tx")
-                .context("Getting 'tx' records")?;
+                .with_context("Getting 'tx' records")?;
             let mut sorted_records: Vec<_> = records.into_iter().collect();
             sorted_records.sort_by(|(key1, _), (key2, _)| key1.data.cmp(&key2.data));
             for (key, value) in sorted_records {

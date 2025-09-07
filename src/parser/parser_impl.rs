@@ -231,6 +231,7 @@ impl<'a> Parser<'a> {
         if self.offset < self.buffer.len() {
             return Err(ParseError::UnconsumedBytes {
                 remaining: self.remaining(),
+                context: None,
             });
         }
         Ok(())
@@ -242,6 +243,7 @@ impl<'a> Parser<'a> {
                 offset: self.offset,
                 needed: n,
                 remaining: self.remaining(),
+                context: None,
             });
         }
         let bytes = &self.buffer[self.offset..self.offset + n];

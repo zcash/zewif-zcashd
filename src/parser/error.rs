@@ -6,9 +6,11 @@ pub enum ParseError {
         offset: usize,
         needed: usize,
         remaining: usize,
+        context: Option<String>,
     },
     UnconsumedBytes {
         remaining: usize,
+        context: Option<String>,
     },
     InvalidData {
         kind: InvalidDataKind,
@@ -114,23 +116,42 @@ pub enum InvalidDataKind {
 
 impl ParseError {
     pub fn with_context<S: Into<String>>(self, context: S) -> Self {
+        let context_str = context.into();
         match self {
+            ParseError::BufferUnderflow { offset, needed, remaining, context: existing_context } => {
+                let new_context = if let Some(existing) = existing_context {
+                    format!("{}: {}", context_str, existing)
+                } else {
+                    context_str
+                };
+                ParseError::BufferUnderflow {
+                    offset,
+                    needed,
+                    remaining,
+                    context: Some(new_context),
+                }
+            }
+            ParseError::UnconsumedBytes { remaining, context: existing_context } => {
+                let new_context = if let Some(existing) = existing_context {
+                    format!("{}: {}", context_str, existing)
+                } else {
+                    context_str
+                };
+                ParseError::UnconsumedBytes {
+                    remaining,
+                    context: Some(new_context),
+                }
+            }
             ParseError::InvalidData { kind, context: existing_context } => {
                 let new_context = if let Some(existing) = existing_context {
-                    format!("{}: {}", context.into(), existing)
+                    format!("{}: {}", context_str, existing)
                 } else {
-                    context.into()
+                    context_str
                 };
                 ParseError::InvalidData {
                     kind,
                     context: Some(new_context),
                 }
-            }
-            other => ParseError::InvalidData {
-                kind: InvalidDataKind::Other {
-                    message: other.to_string(),
-                },
-                context: Some(context.into()),
             }
         }
     }
@@ -148,11 +169,21 @@ impl ParseError {
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParseError::BufferUnderflow { offset, needed, remaining } => {
-                write!(f, "Buffer underflow at offset {}, needed {} bytes, only {} remaining", offset, needed, remaining)
+            ParseError::BufferUnderflow { offset, needed, remaining, context } => {
+                let base_msg = format!("Buffer underflow at offset {}, needed {} bytes, only {} remaining", offset, needed, remaining);
+                if let Some(ctx) = context {
+                    write!(f, "{}: {}", ctx, base_msg)
+                } else {
+                    write!(f, "{}", base_msg)
+                }
             }
-            ParseError::UnconsumedBytes { remaining } => {
-                write!(f, "Buffer has {} bytes left", remaining)
+            ParseError::UnconsumedBytes { remaining, context } => {
+                let base_msg = format!("Buffer has {} bytes left", remaining);
+                if let Some(ctx) = context {
+                    write!(f, "{}: {}", ctx, base_msg)
+                } else {
+                    write!(f, "{}", base_msg)
+                }
             }
             ParseError::InvalidData { kind, context } => {
                 if let Some(ctx) = context {
@@ -261,6 +292,7 @@ impl fmt::Display for InvalidDataKind {
 
 impl std::error::Error for ParseError {}
 
+// Handle errors from external crates that still use anyhow
 impl From<anyhow::Error> for ParseError {
     fn from(err: anyhow::Error) -> Self {
         ParseError::InvalidData {
@@ -272,8 +304,6 @@ impl From<anyhow::Error> for ParseError {
     }
 }
 
-// No need for explicit From implementation - anyhow already provides one
-// via its blanket impl for types that implement std::error::Error
 
 impl From<std::io::Error> for ParseError {
     fn from(err: std::io::Error) -> Self {
@@ -351,16 +381,3 @@ impl<T> ResultExt<T> for Result<T> {
     }
 }
 
-impl<T> ResultExt<T> for anyhow::Result<T> {
-    fn with_context<S: Into<String>>(self, context: S) -> Result<T> {
-        match self {
-            Ok(value) => Ok(value),
-            Err(err) => Err(ParseError::InvalidData {
-                kind: InvalidDataKind::Other {
-                    message: err.to_string(),
-                },
-                context: Some(context.into()),
-            }),
-        }
-    }
-}
