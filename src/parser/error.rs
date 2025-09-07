@@ -14,8 +14,6 @@ pub enum ParseError {
         kind: InvalidDataKind,
         context: Option<String>,
     },
-    // Wrapper for anyhow errors during migration (clone by converting to string)
-    Anyhow(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -128,9 +126,6 @@ impl ParseError {
                     context: Some(new_context),
                 }
             }
-            ParseError::Anyhow(err) => {
-                ParseError::Anyhow(format!("{}: {}", context.into(), err))
-            }
             other => ParseError::InvalidData {
                 kind: InvalidDataKind::Other {
                     message: other.to_string(),
@@ -165,9 +160,6 @@ impl fmt::Display for ParseError {
                 } else {
                     write!(f, "{}", kind)
                 }
-            }
-            ParseError::Anyhow(err) => {
-                write!(f, "{}", err)
             }
         }
     }
@@ -271,7 +263,12 @@ impl std::error::Error for ParseError {}
 
 impl From<anyhow::Error> for ParseError {
     fn from(err: anyhow::Error) -> Self {
-        ParseError::Anyhow(err.to_string())
+        ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: err.to_string(),
+            },
+            context: None,
+        }
     }
 }
 
@@ -358,7 +355,12 @@ impl<T> ResultExt<T> for anyhow::Result<T> {
     fn with_context<S: Into<String>>(self, context: S) -> Result<T> {
         match self {
             Ok(value) => Ok(value),
-            Err(err) => Err(ParseError::Anyhow(format!("{}: {}", context.into(), err))),
+            Err(err) => Err(ParseError::InvalidData {
+                kind: InvalidDataKind::Other {
+                    message: err.to_string(),
+                },
+                context: Some(context.into()),
+            }),
         }
     }
 }

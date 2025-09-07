@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Context;
 use crate::parser::error::ParseError;
 use hex::ToHex as _;
 use std::{
@@ -34,7 +34,7 @@ pub struct ZcashdParser<'a> {
 }
 
 impl<'a> ZcashdParser<'a> {
-    pub fn parse_dump(dump: &ZcashdDump, strict: bool) -> Result<(ZcashdWallet, HashSet<DBKey>)> {
+    pub fn parse_dump(dump: &ZcashdDump, strict: bool) -> crate::parser::prelude::Result<(ZcashdWallet, HashSet<DBKey>)> {
         let parser = ZcashdParser::new(dump, strict);
         parser.parse()
     }
@@ -53,13 +53,13 @@ impl<'a> ZcashdParser<'a> {
         self.unparsed_keys.borrow_mut().remove(key);
     }
 
-    fn value_for_keyname(&self, keyname: &str) -> anyhow::Result<&DBValue> {
+    fn value_for_keyname(&self, keyname: &str) -> crate::parser::prelude::Result<&DBValue> {
         let key = self.dump.key_for_keyname(keyname);
         self.mark_key_parsed(&key);
         self.dump.value_for_keyname(keyname).map_err(|e| e.into())
     }
 
-    fn parse(&self) -> Result<(ZcashdWallet, HashSet<DBKey>)> {
+    fn parse(&self) -> crate::parser::prelude::Result<(ZcashdWallet, HashSet<DBKey>)> {
         //
         // Since version 3
         //
