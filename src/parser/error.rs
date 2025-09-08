@@ -292,17 +292,6 @@ impl fmt::Display for InvalidDataKind {
 
 impl std::error::Error for ParseError {}
 
-// Handle errors from external crates that still use anyhow
-impl From<anyhow::Error> for ParseError {
-    fn from(err: anyhow::Error) -> Self {
-        ParseError::InvalidData {
-            kind: InvalidDataKind::Other {
-                message: err.to_string(),
-            },
-            context: None,
-        }
-    }
-}
 
 
 impl From<std::io::Error> for ParseError {
@@ -363,6 +352,17 @@ impl From<zcash_keys::keys::AddressGenerationError> for ParseError {
         ParseError::InvalidData {
             kind: InvalidDataKind::Other {
                 message: format!("Address generation error: {}", err),
+            },
+            context: None,
+        }
+    }
+}
+
+impl From<anyhow::Error> for ParseError {
+    fn from(err: anyhow::Error) -> Self {
+        ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: err.to_string(),
             },
             context: None,
         }
