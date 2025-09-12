@@ -1,7 +1,6 @@
-use anyhow::{Context, Error, Result, bail};
 use zewif::Blob20;
 
-use crate::{parse, parser::prelude::*};
+use crate::{parser::prelude::*, zcashd_wallet::error::{ZcashdWalletError, Result}};
 
 pub const U160_SIZE: usize = 20;
 
@@ -25,7 +24,7 @@ pub const U160_SIZE: usize = 20;
 ///
 /// # Examples
 /// ```
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// # use zewif_zcashd::zcashd_wallet::u160;
 /// # fn example() -> Result<()> {
 /// // Create a u160 from a byte slice (e.g., for a P2PKH address hash)
@@ -66,7 +65,7 @@ impl u160 {
     ///
     /// # Examples
     /// ```
-    /// # use anyhow::Result;
+    /// # use zewif_zcashd::parser::error::Result;
     /// # use zewif_zcashd::zcashd_wallet::{u160, U160_SIZE};
     /// # fn example() -> Result<()> {
     /// // Valid slice (exactly 20 bytes)
@@ -84,17 +83,25 @@ impl u160 {
     /// # Errors
     /// Returns an error if the byte slice is not exactly 20 bytes long.
     pub fn from_slice(bytes: &[u8]) -> Result<Self> {
-        let blob = Blob20::from_slice(bytes).context("Creating U160 from slice")?;
+        let blob = Blob20::from_slice(bytes).map_err(|e| ZcashdWalletError::InvalidLength {
+            expected: U160_SIZE,
+            actual: bytes.len(),
+            type_name: "u160",
+        })?;
         Ok(Self(blob.into()))
     }
 }
 
 impl TryFrom<&[u8]> for u160 {
-    type Error = Error;
+    type Error = ZcashdWalletError;
 
-    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+    fn try_from(bytes: &[u8]) -> std::result::Result<Self, Self::Error> {
         if bytes.len() != U160_SIZE {
-            bail!("Invalid data length: expected 20, got {}", bytes.len());
+            return Err(ZcashdWalletError::InvalidLength {
+                expected: U160_SIZE,
+                actual: bytes.len(),
+                type_name: "u160",
+            });
         }
         let mut a = [0u8; U160_SIZE];
         a.copy_from_slice(bytes);
@@ -103,17 +110,17 @@ impl TryFrom<&[u8]> for u160 {
 }
 
 impl TryFrom<&[u8; U160_SIZE]> for u160 {
-    type Error = Error;
+    type Error = ZcashdWalletError;
 
-    fn try_from(bytes: &[u8; U160_SIZE]) -> Result<Self, Self::Error> {
+    fn try_from(bytes: &[u8; U160_SIZE]) -> std::result::Result<Self, Self::Error> {
         Ok(Self(*bytes))
     }
 }
 
 impl TryFrom<&Vec<u8>> for u160 {
-    type Error = Error;
+    type Error = ZcashdWalletError;
 
-    fn try_from(bytes: &Vec<u8>) -> Result<Self, Self::Error> {
+    fn try_from(bytes: &Vec<u8>) -> std::result::Result<Self, Self::Error> {
         Self::try_from(bytes.as_slice())
     }
 }
@@ -147,8 +154,10 @@ impl std::fmt::Display for u160 {
 }
 
 impl Parse for u160 {
-    fn parse(p: &mut Parser) -> Result<Self> {
-        let blob = parse!(p, Blob20, "u160")?;
-        Ok(Self(blob.into()))
+    fn parse(p: &mut Parser) -> crate::parser::error::Result<Self> {
+        let bytes = p.next(U160_SIZE)?;
+        let mut array = [0u8; U160_SIZE];
+        array.copy_from_slice(bytes);
+        Ok(Self(array))
     }
 }

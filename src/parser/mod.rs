@@ -29,7 +29,6 @@
 //! ```no_run
 //! use zewif::{TxId, Transaction};
 //! use zewif_zcashd::{parse, parser::prelude::*};
-//! use anyhow::Result;
 //!
 //! # fn example(data: &[u8]) -> Result<()> {
 //! let mut parser = Parser::new(&data);
@@ -55,6 +54,7 @@
 
 use crate::mod_use;
 
+pub mod error;
 pub(crate) mod parse_macro;
 pub mod prelude;
 

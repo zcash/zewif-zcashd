@@ -1,4 +1,3 @@
-use anyhow::{Context, Result, bail};
 use hex::ToHex;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
@@ -132,7 +131,12 @@ impl ZcashdDump {
     pub fn value_for_key(&self, key: &DBKey) -> Result<&DBValue> {
         match self.records.get(key) {
             Some(value) => Ok(value),
-            None => bail!("No record found for key: {}", key),
+            None => Err(ParseError::InvalidData {
+                kind: InvalidDataKind::KeyNotFound {
+                    key: key.to_string(),
+                },
+                context: None,
+            }),
         }
     }
 
@@ -143,7 +147,12 @@ impl ZcashdDump {
     pub fn value_for_keyname(&self, keyname: &str) -> Result<&DBValue> {
         let key = self.key_for_keyname(keyname);
         self.value_for_key(&key)
-            .context(format!("No record found for keyname: {}", keyname))
+            .map_err(|_| ParseError::InvalidData {
+                kind: InvalidDataKind::KeynameNotFound {
+                    keyname: keyname.to_string(),
+                },
+                context: None,
+            })
     }
 
     pub fn has_value_for_keyname(&self, keyname: &str) -> bool {
@@ -160,7 +169,12 @@ impl ZcashdDump {
         let keys = self
             .keys_by_keyname
             .get(keyname)
-            .context(format!("No records found for keyname: {}", keyname))?;
+            .ok_or_else(|| ParseError::InvalidData {
+                kind: InvalidDataKind::KeynameNotFound {
+                    keyname: keyname.to_string(),
+                },
+                context: None,
+            })?;
         let mut records = HashMap::new();
         for key in keys {
             let value = self.value_for_key(key)?;
@@ -177,16 +191,33 @@ impl ZcashdDump {
         let keys = self
             .keys_by_keyname
             .get(keyname)
-            .context(format!("No records found for keyname: {}", keyname))?;
+            .ok_or_else(|| ParseError::InvalidData {
+                kind: InvalidDataKind::KeynameNotFound {
+                    keyname: keyname.to_string(),
+                },
+                context: None,
+            })?;
         if keys.len() != 1 {
-            bail!("Expected exactly one record for keyname: {}", keyname);
+            return Err(ParseError::InvalidData {
+                kind: InvalidDataKind::RecordCountError {
+                    keyname: keyname.to_string(),
+                    expected: "exactly one".to_string(),
+                    actual: keys.len(),
+                },
+                context: None,
+            });
         }
         match keys.iter().next() {
             Some(key) => {
                 let value = self.value_for_key(key)?;
                 Ok((key.clone(), value.clone()))
             }
-            None => bail!("No record found for keyname: {}", keyname),
+            None => Err(ParseError::InvalidData {
+                kind: InvalidDataKind::KeynameNotFound {
+                    keyname: keyname.to_string(),
+                },
+                context: None,
+            }),
         }
     }
 

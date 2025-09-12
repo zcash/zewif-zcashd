@@ -1,4 +1,4 @@
-use anyhow::Result;
+
 
 use zewif::sapling::SaplingIncomingViewingKey;
 
@@ -17,8 +17,8 @@ impl SaplingKey {
         ivk: SaplingIncomingViewingKey,
         extsk: sapling::zip32::ExtendedSpendingKey,
         metadata: KeyMetadata,
-    ) -> Result<Self> {
-        Ok(Self { ivk, extsk, metadata })
+    ) -> Self {
+        Self { ivk, extsk, metadata }
     }
 
     pub fn ivk(&self) -> &SaplingIncomingViewingKey {

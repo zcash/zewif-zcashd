@@ -6,7 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{Context, Result, anyhow, bail};
+use crate::parser::error::{ParseError, InvalidDataKind};
 use zcash_keys::keys::UnifiedFullViewingKey;
 use zewif::{Blob, Data, SeedFingerprint, sapling::SaplingIncomingViewingKey};
 
@@ -20,7 +20,12 @@ impl Parse for String {
     fn parse(p: &mut Parser) -> Result<Self> {
         let length = parse!(p, CompactSize, "string length")?;
         let bytes = parse!(p, bytes = *length, "string")?;
-        String::from_utf8(bytes.to_vec()).context("string")
+        String::from_utf8(bytes.to_vec()).map_err(|e| ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: format!("Invalid UTF-8 string: {}", e),
+            },
+            context: Some("string".to_string()),
+        })
     }
 }
 
@@ -32,9 +37,19 @@ where
     let parsed = parse!(p, T, "string length")?;
     let length = parsed
         .try_into()
-        .context("converting string length to usize")?;
+        .map_err(|e| ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: format!("Failed to convert string length to usize: {}", e),
+            },
+            context: Some("string length conversion".to_string()),
+        })?;
     let bytes = parse!(p, bytes = length, "string data")?;
-    String::from_utf8(bytes.to_vec()).context("string")
+    String::from_utf8(bytes.to_vec()).map_err(|e| ParseError::InvalidData {
+        kind: InvalidDataKind::Other {
+            message: format!("Invalid UTF-8 string: {}", e),
+        },
+        context: Some("string data".to_string()),
+    })
 }
 
 impl Parse for bool {
@@ -43,14 +58,17 @@ impl Parse for bool {
         match byte {
             0 => Ok(false),
             1 => Ok(true),
-            _ => bail!("Invalid boolean value: {}", byte),
+            _ => Err(ParseError::InvalidData {
+                kind: InvalidDataKind::InvalidBooleanValue { value: byte },
+                context: Some("bool".to_string()),
+            }),
         }
     }
 }
 
 impl Parse for u8 {
     fn parse(p: &mut Parser) -> Result<Self> {
-        let bytes = p.next(1).context("u8")?;
+        let bytes = p.next(1)?;
         Ok(bytes[0])
     }
 }
@@ -58,30 +76,51 @@ impl Parse for u8 {
 impl Parse for u16 {
     fn parse(p: &mut Parser) -> Result<Self> {
         const SIZE: usize = std::mem::size_of::<u16>();
-        let bytes = p.next(SIZE).context("u16")?;
-        Ok(u16::from_le_bytes(bytes.try_into().context("u16")?))
+        let bytes = p.next(SIZE)?;
+        let array = bytes.try_into().map_err(|_| ParseError::InvalidData {
+            kind: InvalidDataKind::LengthInvalid {
+                expected: SIZE,
+                actual: bytes.len(),
+            },
+            context: Some("u16".to_string()),
+        })?;
+        Ok(u16::from_le_bytes(array))
     }
 }
 
 impl Parse for u32 {
     fn parse(p: &mut Parser) -> Result<Self> {
         const SIZE: usize = std::mem::size_of::<u32>();
-        let bytes = p.next(SIZE).context("u32")?;
-        Ok(u32::from_le_bytes(bytes.try_into().context("u32")?))
+        let bytes = p.next(SIZE)?;
+        let array = bytes.try_into().map_err(|_| ParseError::InvalidData {
+            kind: InvalidDataKind::LengthInvalid {
+                expected: SIZE,
+                actual: bytes.len(),
+            },
+            context: Some("u32".to_string()),
+        })?;
+        Ok(u32::from_le_bytes(array))
     }
 }
 
 impl Parse for u64 {
     fn parse(p: &mut Parser) -> Result<Self> {
         const SIZE: usize = std::mem::size_of::<u64>();
-        let bytes = p.next(SIZE).context("u64")?;
-        Ok(u64::from_le_bytes(bytes.try_into().context("u64")?))
+        let bytes = p.next(SIZE)?;
+        let array = bytes.try_into().map_err(|_| ParseError::InvalidData {
+            kind: InvalidDataKind::LengthInvalid {
+                expected: SIZE,
+                actual: bytes.len(),
+            },
+            context: Some("u64".to_string()),
+        })?;
+        Ok(u64::from_le_bytes(array))
     }
 }
 
 impl Parse for i8 {
     fn parse(p: &mut Parser) -> Result<Self> {
-        let bytes = p.next(1).context("i8")?;
+        let bytes = p.next(1)?;
         Ok(bytes[0] as i8)
     }
 }
@@ -89,24 +128,45 @@ impl Parse for i8 {
 impl Parse for i16 {
     fn parse(p: &mut Parser) -> Result<Self> {
         const SIZE: usize = std::mem::size_of::<i16>();
-        let bytes = p.next(SIZE).context("i16")?;
-        Ok(i16::from_le_bytes(bytes.try_into().context("i16")?))
+        let bytes = p.next(SIZE)?;
+        let array = bytes.try_into().map_err(|_| ParseError::InvalidData {
+            kind: InvalidDataKind::LengthInvalid {
+                expected: SIZE,
+                actual: bytes.len(),
+            },
+            context: Some("i16".to_string()),
+        })?;
+        Ok(i16::from_le_bytes(array))
     }
 }
 
 impl Parse for i32 {
     fn parse(p: &mut Parser) -> Result<Self> {
         const SIZE: usize = std::mem::size_of::<i32>();
-        let bytes = p.next(SIZE).context("i32")?;
-        Ok(i32::from_le_bytes(bytes.try_into().context("i32")?))
+        let bytes = p.next(SIZE)?;
+        let array = bytes.try_into().map_err(|_| ParseError::InvalidData {
+            kind: InvalidDataKind::LengthInvalid {
+                expected: SIZE,
+                actual: bytes.len(),
+            },
+            context: Some("i32".to_string()),
+        })?;
+        Ok(i32::from_le_bytes(array))
     }
 }
 
 impl Parse for i64 {
     fn parse(p: &mut Parser) -> Result<Self> {
         const SIZE: usize = std::mem::size_of::<i64>();
-        let bytes = p.next(SIZE).context("i64")?;
-        Ok(i64::from_le_bytes(bytes.try_into().context("i64")?))
+        let bytes = p.next(SIZE)?;
+        let array = bytes.try_into().map_err(|_| ParseError::InvalidData {
+            kind: InvalidDataKind::LengthInvalid {
+                expected: SIZE,
+                actual: bytes.len(),
+            },
+            context: Some("i64".to_string()),
+        })?;
+        Ok(i64::from_le_bytes(array))
     }
 }
 
@@ -156,7 +216,12 @@ pub fn parse_fixed_length_array<T: Parse, const N: usize>(p: &mut Parser) -> Res
     let items = parse_fixed_length_vec(p, N)?;
     let array: [T; N] = items
         .try_into()
-        .map_err(|_| anyhow::anyhow!("Failed to convert Vec to fixed length array"))?;
+        .map_err(|_| ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: "Failed to convert Vec to fixed length array".to_string(),
+            },
+            context: None,
+        })?;
     Ok(array)
 }
 
@@ -167,7 +232,12 @@ pub fn parse_fixed_length_array_with_param<T: ParseWithParam<U>, U: Clone, const
     let items = parse_fixed_length_vec_with_param(p, N, param)?;
     let array: [T; N] = items
         .try_into()
-        .map_err(|_| anyhow::anyhow!("Failed to convert Vec to fixed length array"))?;
+        .map_err(|_| ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: "Failed to convert Vec to fixed length array".to_string(),
+            },
+            context: None,
+        })?;
     Ok(array)
 }
 
@@ -212,7 +282,7 @@ pub fn parse_map<K: Parse, V: Parse>(p: &mut Parser) -> Result<Vec<(K, V)>> {
     let length = *parse!(p, CompactSize, "map length")?;
     let mut items = Vec::with_capacity(length);
     for _ in 0..length {
-        items.push(parse_pair::<K, V>(p).context("map item")?);
+        items.push(parse_pair::<K, V>(p)?);
     }
     Ok(items)
 }
@@ -256,7 +326,10 @@ pub fn parse_optional<T: Parse>(p: &mut Parser) -> Result<Option<T>> {
     match parse!(p, u8, "optional discriminant")? {
         0x00 => Ok(None),
         0x01 => Ok(Some(parse!(p, "optional value")?)),
-        discriminant => bail!("Invalid optional discriminant: 0x{:02x}", discriminant),
+        discriminant => Err(ParseError::InvalidData {
+            kind: InvalidDataKind::InvalidOptionalDiscriminant { value: discriminant },
+            context: Some("optional".to_string()),
+        }),
     }
 }
 
@@ -277,7 +350,7 @@ impl<T: Parse> Parse for Option<T> {
 /// # use zewif::Blob;
 /// # use zewif_zcashd::parser::Parser;
 /// # use zewif_zcashd::parse;
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// #
 /// # fn example(parser: &mut Parser) -> Result<()> {
 /// // Parse a 32-byte transaction hash from a binary stream
@@ -296,9 +369,13 @@ impl<const N: usize> Parse for zewif::Blob<N> {
         Self: Sized,
     {
         let data = parser
-            .next(N)
-            .with_context(|| format!("Parsing Blob<{}>", N))?;
-        Ok(Self::from_slice(data)?)
+            .next(N)?;
+        Self::from_slice(data).map_err(|_| ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: format!("Failed to create Blob<{}> from slice", N),
+            },
+            context: None,
+        })
     }
 }
 
@@ -318,7 +395,7 @@ impl Parse for zewif::Data {
     /// # use zewif::Data;
     /// # use zewif_zcashd::parser::Parser;
     /// # use zewif_zcashd::parse;
-    /// # use anyhow::Result;
+    /// # use zewif_zcashd::parser::error::Result;
     /// #
     /// # fn example(parser: &mut Parser) -> Result<()> {
     /// // Parse a data structure with length prefix
@@ -328,7 +405,7 @@ impl Parse for zewif::Data {
     /// ```
     fn parse(p: &mut Parser) -> Result<Self> {
         let len = parse!(p, crate::zcashd_wallet::CompactSize, "Data length")?;
-        let bytes = p.next(*len).context("Parsing Data")?;
+        let bytes = p.next(*len)?;
         Ok(Self::from_slice(bytes))
     }
 }
@@ -336,7 +413,12 @@ impl Parse for zewif::Data {
 impl Parse for zewif::Amount {
     fn parse(p: &mut Parser) -> Result<Self> {
         let zat_balance = parse!(p, i64, "Zat balance")?;
-        Self::try_from(zat_balance).map_err(|_| anyhow!("Invalid Zat balance: {}", zat_balance))
+        Self::try_from(zat_balance).map_err(|_| ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: format!("Invalid Zat balance: {}", zat_balance),
+            },
+            context: None,
+        })
     }
 }
 
@@ -348,7 +430,7 @@ impl Parse for zewif::BlockHash {
     /// # use zewif::BlockHash;
     /// # use zewif_zcashd::parser::Parser;
     /// # use zewif_zcashd::parse;
-    /// # use anyhow::Result;
+    /// # use zewif_zcashd::parser::error::Result;
     /// #
     /// # fn example(parser: &mut Parser) -> Result<()> {
     /// // Parse a transaction ID from a binary stream
@@ -364,7 +446,12 @@ impl Parse for zewif::BlockHash {
 impl Parse for zewif::MnemonicLanguage {
     fn parse(p: &mut Parser) -> Result<Self> {
         let value = parse!(p, "language value")?;
-        zewif::MnemonicLanguage::from_u32(value)
+        zewif::MnemonicLanguage::from_u32(value).map_err(|e| ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: format!("Invalid mnemonic language value: {}", e),
+            },
+            context: None,
+        })
     }
 }
 
@@ -378,7 +465,7 @@ impl Parse for zewif::Bip39Mnemonic {
 }
 
 impl Parse for zewif::BlockHeight {
-    fn parse(p: &mut Parser) -> anyhow::Result<Self> {
+    fn parse(p: &mut Parser) -> Result<Self> {
         let height = parse!(p, u32, "BlockHeight")?;
         Ok(Self::from(height))
     }
@@ -399,7 +486,7 @@ impl Parse for zewif::TxId {
     /// # use zewif::TxId;
     /// # use zewif_zcashd::parser::Parser;
     /// # use zewif_zcashd::parse;
-    /// # use anyhow::Result;
+    /// # use zewif_zcashd::parser::error::Result;
     /// #
     /// # fn example(parser: &mut Parser) -> Result<()> {
     /// // Parse a transaction ID from a binary stream
@@ -443,8 +530,18 @@ impl Parse for UnifiedFullViewingKey {
         use zcash_address::unified::Encoding;
 
         let ufvk_str: String = parse!(p, "ufvk string")?;
-        let (_, ufvk) = zcash_address::unified::Ufvk::decode(&ufvk_str)?;
-        Ok(Self::parse(&ufvk)?)
+        let (_, ufvk) = zcash_address::unified::Ufvk::decode(&ufvk_str).map_err(|e| ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: format!("Failed to decode UFVK: {}", e),
+            },
+            context: None,
+        })?;
+        Self::parse(&ufvk).map_err(|e| ParseError::InvalidData {
+            kind: InvalidDataKind::Other {
+                message: format!("Failed to parse UFVK: {}", e),
+            },
+            context: None,
+        })
     }
 }
 
@@ -453,6 +550,11 @@ impl Parse for ::orchard::keys::IncomingViewingKey {
         let bytes: Blob<64> = parse!(p, "orchard IVK")?;
         ::orchard::keys::IncomingViewingKey::from_bytes(bytes.as_bytes())
             .into_option()
-            .ok_or(anyhow::anyhow!("Not a valid Orchard incoming viewing key"))
+            .ok_or_else(|| ParseError::InvalidData {
+                kind: InvalidDataKind::Other {
+                    message: "Not a valid Orchard incoming viewing key".to_string(),
+                },
+                context: None,
+            })
     }
 }

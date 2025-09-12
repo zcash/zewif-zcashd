@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::parser::prelude::*;
 use hex::ToHex;
 use ripemd::{Digest, Ripemd160};
 use sha2::Sha256;

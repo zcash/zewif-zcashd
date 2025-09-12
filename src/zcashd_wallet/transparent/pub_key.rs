@@ -1,8 +1,6 @@
-use anyhow::{Context, Result, bail};
-
 use zewif::Data;
 
-use crate::{parse, parser::prelude::*, zcashd_wallet::CompactSize};
+use crate::{parse, parser::{prelude::*, error::{ParseError, InvalidDataKind}}, zcashd_wallet::CompactSize};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PubKey(Data);
@@ -42,10 +40,17 @@ impl Parse for PubKey {
     fn parse(p: &mut Parser) -> Result<Self> {
         let size = *parse!(p, CompactSize, "PubKey size")?;
         if size != 33 && size != 65 {
-            bail!("Invalid PubKey size: {}", size);
+            return Err(ParseError::InvalidData {
+                kind: InvalidDataKind::InvalidKeySize {
+                    key_type: "PubKey",
+                    expected: vec![33, 65],
+                    actual: size,
+                },
+                context: None,
+            });
         }
 
-        let key_data = p.next(size).map(Data::from_slice).context("PubKey")?;
+        let key_data = p.next(size).map(Data::from_slice)?;
         Ok(Self(key_data))
     }
 }

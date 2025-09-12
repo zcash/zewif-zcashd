@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use crate::parser::prelude::*;
 use bitflags::bitflags;
 use std::{
     convert::Infallible,
@@ -41,36 +41,36 @@ enum AddressType {
 impl TryFromAddress for AddressType {
     type Error = Infallible;
 
-    fn try_from_sprout(_: NetworkType, _: [u8; 64]) -> Result<Self, ConversionError<Self::Error>> {
+    fn try_from_sprout(_: NetworkType, _: [u8; 64]) -> std::result::Result<Self, ConversionError<Self::Error>> {
         Ok(AddressType::Sprout)
     }
 
-    fn try_from_sapling(_: NetworkType, _: [u8; 43]) -> Result<Self, ConversionError<Self::Error>> {
+    fn try_from_sapling(_: NetworkType, _: [u8; 43]) -> std::result::Result<Self, ConversionError<Self::Error>> {
         Ok(AddressType::Sapling)
     }
 
     fn try_from_unified(
         _: NetworkType,
         _: zcash_address::unified::Address,
-    ) -> Result<Self, ConversionError<Self::Error>> {
+    ) -> std::result::Result<Self, ConversionError<Self::Error>> {
         Ok(AddressType::Unified)
     }
 
     fn try_from_transparent_p2pkh(
         _: NetworkType,
         _: [u8; 20],
-    ) -> Result<Self, ConversionError<Self::Error>> {
+    ) -> std::result::Result<Self, ConversionError<Self::Error>> {
         Ok(AddressType::P2pkh)
     }
 
     fn try_from_transparent_p2sh(
         _: NetworkType,
         _: [u8; 20],
-    ) -> Result<Self, ConversionError<Self::Error>> {
+    ) -> std::result::Result<Self, ConversionError<Self::Error>> {
         Ok(AddressType::P2sh)
     }
 
-    fn try_from_tex(_: NetworkType, _: [u8; 20]) -> Result<Self, ConversionError<Self::Error>> {
+    fn try_from_tex(_: NetworkType, _: [u8; 20]) -> std::result::Result<Self, ConversionError<Self::Error>> {
         Ok(AddressType::Tex)
     }
 }
@@ -144,9 +144,12 @@ impl AddressId {
             AddressType::Sapling => Ok(Self::Sapling(addr_str.to_string())),
             AddressType::P2pkh | AddressType::P2sh => Ok(Self::Transparent(addr_str.to_string())),
             AddressType::Unified => Ok(Self::Unified(addr_str.to_string())),
-            AddressType::Tex => Err(anyhow!(
-                "TEX addresses do not occur in zcashd address data."
-            )),
+            AddressType::Tex => Err(ParseError::InvalidData {
+                kind: InvalidDataKind::Other {
+                    message: "TEX addresses do not occur in zcashd address data.".to_string(),
+                },
+                context: None,
+            }),
         }
     }
 
@@ -186,9 +189,9 @@ impl Display for AddressId {
 }
 
 impl FromStr for AddressId {
-    type Err = anyhow::Error;
+    type Err = Box<dyn std::error::Error>;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         if let Some(addr) = s.strip_prefix("t:") {
             Ok(Self::Transparent(addr.to_string()))
         } else if let Some(addr) = s.strip_prefix("zs:") {
@@ -203,7 +206,7 @@ impl FromStr for AddressId {
         //            let account_id = UfvkFingerprint::from_bytes(&id_bytes)?;
         //            Ok(Self::UnifiedAccountAddress(account_id))
         } else {
-            Err(anyhow::anyhow!("Invalid AddressId format: {}", s))
+            Err(format!("Invalid AddressId format: {}", s).into())
         }
     }
 }

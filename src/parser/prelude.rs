@@ -15,7 +15,6 @@
 //!
 //! ```ignore
 //! use zewif_zcashd::parser::prelude::*;
-//! use anyhow::Result;
 //!
 //! struct MyType {}
 //!
@@ -31,6 +30,11 @@
 //! `std::prelude`) of providing the most commonly needed imports in a single module.
 
 #[doc(hidden)]
-pub use super::parser_impl::*;
+pub use super::error::{
+    InvalidDataKind, ParseError, Result, ResultExt,
+    RecordType, MetadataType, UnifiedMetadataType, DuplicateEntryType
+};
+#[doc(hidden)]
+pub use super::parser_impl::{Parse, ParseWithParam, Parser};
 #[doc(hidden)]
 pub use crate::zcashd_wallet::*;

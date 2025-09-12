@@ -5,9 +5,10 @@
 //! raw bytes. It includes both the low-level `Parser` for byte manipulation and the
 //! higher-level `Parse` and `ParseWithParam` traits for structured type parsing.
 
-use anyhow::{Result, bail};
-
 use zewif::Data;
+
+use crate::parser::error::{ParseError, Result};
+
 
 /// A trait for types that can be parsed from a binary data stream.
 ///
@@ -23,7 +24,7 @@ use zewif::Data;
 ///
 /// # Examples
 /// ```no_run
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// # use zewif_zcashd::parser::{Parse, Parser};
 /// #
 /// // Implementing Parse for a custom type
@@ -33,7 +34,7 @@ use zewif::Data;
 /// }
 ///
 /// impl Parse for MyType {
-///     fn parse(p: &mut Parser) -> Result<Self> {
+///     fn parse(p: &mut Parser) -> zewif_zcashd::parser::error::Result<Self> {
 ///         let value = u32::parse(p)?;
 ///         let name = String::parse(p)?;
 ///         Ok(Self { value, name })
@@ -90,7 +91,7 @@ pub trait Parse {
 /// # Examples
 /// ```no_run
 /// # use zewif_zcashd::parser::prelude::*;
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// #
 /// // A type that needs a parameter during parsing
 /// enum ProofType {
@@ -99,7 +100,7 @@ pub trait Parse {
 /// }
 ///
 /// impl ParseWithParam<bool> for ProofType {
-///     fn parse(p: &mut Parser, use_type_a: bool) -> Result<Self> {
+///     fn parse(p: &mut Parser, use_type_a: bool) -> zewif_zcashd::parser::error::Result<Self> {
 ///         if use_type_a {
 ///             Ok(Self::TypeA(u32::parse(p)?))
 ///         } else {
@@ -163,7 +164,7 @@ pub trait ParseWithParam<P> {
 /// # Examples
 /// ```no_run
 /// # use zewif_zcashd::parser::prelude::*;
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// #
 /// # fn example() -> Result<()> {
 /// // Create a parser from raw bytes
@@ -228,19 +229,22 @@ impl<'a> Parser<'a> {
 
     pub fn check_finished(&self) -> Result<()> {
         if self.offset < self.buffer.len() {
-            bail!("Buffer has {} bytes left", self.remaining());
+            return Err(ParseError::UnconsumedBytes {
+                remaining: self.remaining(),
+                context: None,
+            });
         }
         Ok(())
     }
 
     pub fn next(&mut self, n: usize) -> Result<&'a [u8]> {
         if self.offset + n > self.buffer.len() {
-            bail!(
-                "Buffer underflow at offset {}, needed {} bytes, only {} remaining",
-                self.offset,
-                n,
-                self.remaining()
-            );
+            return Err(ParseError::BufferUnderflow {
+                offset: self.offset,
+                needed: n,
+                remaining: self.remaining(),
+                context: None,
+            });
         }
         let bytes = &self.buffer[self.offset..self.offset + n];
         self.offset += n;
@@ -279,6 +283,7 @@ impl<'a> Parser<'a> {
             println!("🔵 {}: {:?}", msg, self.peek_rest());
         }
     }
+
 }
 
 impl std::io::Read for &mut Parser<'_> {
