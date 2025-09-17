@@ -14,14 +14,19 @@ pub struct BDBDump {
 }
 
 impl BDBDump {
-    pub fn from_file(filepath: &Path) -> Result<Self> {
+    pub fn from_file(db_dump_path: &Path, filepath: &Path) -> Result<Self> {
         // Execute the `db_dump` utility
-        let output = Command::new("db_dump")
+        let output = Command::new(db_dump_path)
             .arg(filepath)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
-            .map_err(|e| anyhow!("Error executing db_dump against path {}: {}", filepath.to_string_lossy(), e))?;
+            .map_err(|e| anyhow!(
+                "Error executing {} against path {}: {}",
+                db_dump_path.display(),
+                filepath.display(),
+                e
+            ))?;
 
         // Check if db_dump executed successfully
         if !output.status.success() {
