@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
@@ -14,7 +14,28 @@ pub struct BDBDump {
 }
 
 impl BDBDump {
-    pub fn from_file(db_dump_path: &Path, filepath: &Path) -> Result<Self> {
+    /// Resolves the path to the db_dump utility, preferring the vendored version.
+    fn resolve_db_dump_path() -> PathBuf {
+        if let Some(vendored_path) = option_env!("DB_DUMP_PATH") {
+            let path = PathBuf::from(vendored_path);
+            if path.exists() {
+                return path;
+            }
+        }
+
+        PathBuf::from("db_dump")
+    }
+
+    /// Dumps the BDB database at `filepath`, automatically resolving the db_dump binary.
+    ///
+    /// Uses the vendored db_dump if available, falling back to a system-installed version.
+    pub fn from_file(filepath: &Path) -> Result<Self> {
+        let db_dump_path = Self::resolve_db_dump_path();
+        Self::from_file_with_path(&db_dump_path, filepath)
+    }
+
+    /// Dumps the BDB database at `filepath` using the specified `db_dump_path` binary.
+    pub fn from_file_with_path(db_dump_path: &Path, filepath: &Path) -> Result<Self> {
         // Execute the `db_dump` utility
         let output = Command::new(db_dump_path)
             .arg(filepath)
