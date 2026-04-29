@@ -18,9 +18,11 @@ generic ZeWIF representation.
 
 ## What this crate does
 
-`zcashd` stores wallets as Berkeley DB files containing a heterogeneous mix of
-serialized records (HD seeds, transparent keys, sapling keys, unified
-accounts, transactions, witnesses, metadata, etc.). Migrating that data
+This crate provides the ability to migrate wallet data from a `zcashd` wallet
+backup, into the ZeWIF standard format. `zcashd` stores wallets as Berkeley DB
+files containing a heterogeneous mix of serialized records (HD seeds,
+transparent keys, sapling keys, unified accounts, transactions, witnesses,
+metadata, etc.). Migrating that data
 faithfully requires:
 
 1. **Reading the BDB file.** Done by shelling out to `db_dump` to produce a
