@@ -20,7 +20,9 @@ use crate::{
         orchard::OrchardNoteCommitmentTree,
         sapling::{SaplingKey, SaplingKeys, SaplingZPaymentAddress},
         sprout::{SproutKeys, SproutPaymentAddress, SproutSpendingKey},
-        transparent::{KeyPair, KeyPoolEntry, Keys, PrivKey, PubKey, WalletKey, WalletKeys},
+        transparent::{
+            KeyPair, KeyPoolEntry, Keys, PrivKey, PubKey, WalletKey, WalletKeys, WatchScript,
+        },
         u252,
     },
 };
@@ -127,6 +129,7 @@ impl<'a> ZcashdParser<'a> {
         // vkey
 
         // watchs
+        let watch_scripts = self.parse_watch_scripts()?;
 
         // **witnesscachesize**
         let witnesscachesize = self.parse_i64("witnesscachesize")?;
@@ -196,6 +199,7 @@ impl<'a> ZcashdParser<'a> {
             wallet_keys,
             transactions,
             unified_accounts,
+            watch_scripts,
             witnesscachesize,
         );
 
@@ -589,6 +593,28 @@ impl<'a> ZcashdParser<'a> {
         Ok(orchard_note_commitment_tree)
     }
 
+    fn parse_watch_scripts(&self) -> Result<Vec<WatchScript>> {
+        if !self.dump.has_keys_for_keyname("watchs") {
+            return Ok(Vec::new());
+        }
+        let records = self
+            .dump
+            .records_for_keyname("watchs")
+            .context("Getting 'watchs' records")?;
+        // Sort by BDB key bytes so the resulting `Vec` is deterministic
+        // across runs. BDB primary-key uniqueness already guarantees no
+        // duplicates, so an explicit dedupe set is unnecessary.
+        let mut sorted: Vec<_> = records.into_iter().collect();
+        sorted.sort_by(|(a, _), (b, _)| a.data.cmp(&b.data));
+        let mut watch_scripts = Vec::with_capacity(sorted.len());
+        for (key, _value) in sorted {
+            let watch_script = parse!(buf = &key.data, WatchScript, "watch-only script")?;
+            watch_scripts.push(watch_script);
+            self.mark_key_parsed(&key);
+        }
+        Ok(watch_scripts)
+    }
+
     fn parse_key_pool(&self) -> Result<HashMap<i64, KeyPoolEntry>> {
         let records = self
             .dump
@@ -641,5 +667,97 @@ impl<'a> ZcashdParser<'a> {
             }
         }
         Ok(transactions)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use zewif::{Data, Network};
+
+    use super::*;
+    use crate::{BDBDump, ZcashdDump, zcashd_wallet::transparent::WatchScriptKind};
+
+    /// Serializes a BDB key as a length-prefixed keyname followed by raw key
+    /// bytes — the exact wire format `ZcashdDump::from_bdb_dump` consumes.
+    /// Only the keynames used by these tests are short enough that
+    /// `CompactSize` reduces to a single byte.
+    fn make_bdb_key(keyname: &str, key_data: &[u8]) -> Data {
+        assert!(keyname.len() < 253, "test helper only supports short keynames");
+        let mut bytes = Vec::with_capacity(1 + keyname.len() + key_data.len());
+        bytes.push(keyname.len() as u8);
+        bytes.extend_from_slice(keyname.as_bytes());
+        bytes.extend_from_slice(key_data);
+        Data::from_slice(&bytes)
+    }
+
+    fn dump_with_records(records: Vec<(Data, Data)>) -> ZcashdDump {
+        let bdb = BDBDump {
+            header_records: HashMap::new(),
+            data_records: records.into_iter().collect(),
+        };
+        ZcashdDump::from_bdb_dump(&bdb, true).expect("from_bdb_dump")
+    }
+
+    /// Verifies `parse_watch_scripts` plumbs BDB records through to
+    /// `WatchScript`s whose classification matches the encoded address (here,
+    /// a P2PKH script).
+    #[test]
+    fn parse_watch_scripts_classifies_p2pkh() {
+        // OP_DUP OP_HASH160 <20> ... OP_EQUALVERIFY OP_CHECKSIG
+        let mut script = vec![0x76u8, 0xa9, 0x14];
+        script.extend_from_slice(&[0x77; 20]);
+        script.extend_from_slice(&[0x88, 0xac]);
+
+        // The `watchs` BDB key embeds the script as a length-prefixed
+        // payload, mirroring the `Script::parse` contract.
+        let mut key_data = Vec::with_capacity(1 + script.len());
+        key_data.push(script.len() as u8);
+        key_data.extend_from_slice(&script);
+
+        let bdb_key = make_bdb_key("watchs", &key_data);
+        let bdb_value = Data::from_slice(&[]);
+
+        let dump = dump_with_records(vec![(bdb_key, bdb_value)]);
+        let parser = ZcashdParser::new(&dump, true);
+
+        let watch_scripts = parser.parse_watch_scripts().expect("parse_watch_scripts");
+        assert_eq!(watch_scripts.len(), 1);
+
+        let entry = &watch_scripts[0];
+        assert_eq!(entry.script().as_ref(), script.as_slice());
+        assert!(matches!(entry.kind(), WatchScriptKind::P2PKH(_)));
+        assert!(entry.to_address_string(Network::Main).is_some());
+    }
+
+    /// A `watchs` record whose payload is non-standard must round-trip
+    /// verbatim into `WatchScriptKind::Other(...)`.
+    #[test]
+    fn parse_watch_scripts_preserves_other_bytes() {
+        let script = [0xde, 0xad, 0xbe, 0xef];
+
+        let mut key_data = Vec::with_capacity(1 + script.len());
+        key_data.push(script.len() as u8);
+        key_data.extend_from_slice(&script);
+
+        let bdb_key = make_bdb_key("watchs", &key_data);
+        let bdb_value = Data::from_slice(&[]);
+
+        let dump = dump_with_records(vec![(bdb_key, bdb_value)]);
+        let parser = ZcashdParser::new(&dump, true);
+
+        let watch_scripts = parser.parse_watch_scripts().expect("parse_watch_scripts");
+        assert_eq!(watch_scripts.len(), 1);
+
+        let entry = &watch_scripts[0];
+        match entry.kind() {
+            WatchScriptKind::Other(bytes) => {
+                let raw: &[u8] = bytes.as_ref();
+                assert_eq!(raw, &script[..]);
+            }
+            other => panic!("expected Other, got {:?}", other),
+        }
+        assert!(entry.to_address_string(Network::Main).is_none());
     }
 }

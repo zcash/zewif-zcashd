@@ -62,6 +62,26 @@ pub fn convert_transparent_addresses(
         }
     }
 
+    // Watch-only scripts that classify to P2PKH or P2SH have a canonical
+    // t-address encoding and are folded into the merge. P2PK and non-standard
+    // (`Other`) scripts have no t-address representation, so they cannot be
+    // surfaced as addresses on the migrated wallet — the raw scripts remain
+    // on the source `ZcashdWallet` but the migration drops them here. Warn
+    // so the user knows the import is not round-tripping.
+    for watch_script in wallet.watch_scripts() {
+        match watch_script.to_address_string(network) {
+            Some(addr_str) => {
+                merged.ensure_entry(&addr_str);
+            }
+            None => {
+                eprintln!(
+                    "warning: watch-only script with no standard t-address encoding ({:?}) will not appear on the migrated wallet",
+                    watch_script.kind(),
+                );
+            }
+        }
+    }
+
     // `address_purposes` only annotates existing entries; addresses present
     // *only* in `address_purposes` are intentionally not introduced here.
     for (addr, purpose) in wallet.address_purposes() {

@@ -33,7 +33,7 @@ use zewif::{Bip39Mnemonic, Network, TxId, sapling::SaplingIncomingViewingKey};
 use orchard::OrchardNoteCommitmentTree;
 use sapling::{SaplingKeys, SaplingZPaymentAddress};
 use sprout::SproutKeys;
-use transparent::{KeyPoolEntry, Keys, PubKey, WalletKeys};
+use transparent::{KeyPoolEntry, Keys, PubKey, WalletKeys, WatchScript};
 
 #[derive(Debug)]
 pub struct ZcashdWallet {
@@ -59,6 +59,7 @@ pub struct ZcashdWallet {
     wallet_keys: Option<WalletKeys>,
     transactions: HashMap<TxId, WalletTx>,
     unified_accounts: UnifiedAccounts,
+    watch_scripts: Vec<WatchScript>,
     witnesscachesize: i64,
 }
 
@@ -87,6 +88,7 @@ impl ZcashdWallet {
         wallet_keys: Option<WalletKeys>,
         transactions: HashMap<TxId, WalletTx>,
         unified_accounts: UnifiedAccounts,
+        watch_scripts: Vec<WatchScript>,
         witnesscachesize: i64,
     ) -> Self {
         ZcashdWallet {
@@ -112,6 +114,7 @@ impl ZcashdWallet {
             wallet_keys,
             transactions,
             unified_accounts,
+            watch_scripts,
             witnesscachesize,
         }
     }
@@ -203,6 +206,14 @@ impl ZcashdWallet {
 
     pub fn unified_accounts(&self) -> &UnifiedAccounts {
         &self.unified_accounts
+    }
+
+    /// Watch-only output scripts imported via the `importaddress` or
+    /// `importpubkey` RPCs and stored under the `watchs` BDB key. Each entry
+    /// carries the raw script alongside a classification of the standard
+    /// transparent patterns (P2PK / P2PKH / P2SH).
+    pub fn watch_scripts(&self) -> &[WatchScript] {
+        &self.watch_scripts
     }
 
     pub fn witnesscachesize(&self) -> i64 {

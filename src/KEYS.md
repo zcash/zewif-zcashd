@@ -52,7 +52,7 @@
 - [ ] hdseed
 - [ ] sapextfvk
 - [ ] vkey
-- [ ] watchs
+- [x] watchs
 - [ ] wkey
 
 ## Removed
