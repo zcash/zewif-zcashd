@@ -1,10 +1,16 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
+use secp256k1::PublicKey;
 use std::collections::{HashMap, HashSet};
+use zcash_address::{ToAddress, ZcashAddress};
 use zcash_primitives::consensus::NetworkType;
+#[allow(deprecated)]
+use zcash_primitives::legacy::{TransparentAddress, keys::pubkey_to_address};
 use zewif::{Account, ProtocolAddress, TxId, sapling::SaplingExtendedSpendingKey};
 
 use super::{
-    AddressId, AddressRegistry, keys::find_sapling_key_for_ivk, primitives::convert_network,
+    AddressId, AddressRegistry,
+    keys::find_sapling_key_for_ivk,
+    primitives::{address_network_from_zewif, convert_network},
     transaction_addresses::extract_transaction_addresses,
 };
 use crate::{
@@ -395,11 +401,9 @@ fn find_account_for_transparent_address(
                     // - idx' is the address index
 
                     // If this is a unified account HD path, we can extract the account ID
-                    if is_unified_account_keypath(hd_path) {
-                        if let Some(account_id) = extract_account_id_from_keypath(hd_path) {
-                            // Look for unified account with this account ID
-                            return find_account_key_id_by_account_id(unified_accounts, account_id);
-                        }
+                    if let Some(account_id) = extract_account_id_from_keypath(hd_path) {
+                        // Look for unified account with this account ID
+                        return find_account_key_id_by_account_id(unified_accounts, account_id);
                     }
                 }
 
@@ -441,25 +445,21 @@ fn find_account_for_sapling_address(
     todo!()
 }
 
-/// Check if a key path follows the unified account pattern
-fn is_unified_account_keypath(keypath: &str) -> bool {
-    // Typical unified account key path: m/44'/cointype'/account'/type'/idx'
-    let parts: Vec<&str> = keypath.split('/').collect();
-    parts.len() >= 4 && parts[0] == "m" && parts[1].starts_with("44'")
-}
-
-/// Extract account ID from a unified account key path
+/// Extract the BIP-44 account ID from an HD key path, returning `None` for
+/// any path that does not match the canonical
+/// `m/44'/<cointype>'/<account>'/<type>/<idx>` shape. Requires `m/44'` as
+/// the leading two segments and a hardened, integer-parseable fourth
+/// segment (the account).
 fn extract_account_id_from_keypath(keypath: &str) -> Option<u32> {
-    // Keypath format: m/44'/cointype'/account'/type'/idx'
-    let parts: Vec<&str> = keypath.split('/').collect();
-    if parts.len() >= 4 {
-        if let Some(account_part) = parts.get(3) {
-            if let Some(account_str) = account_part.strip_suffix('\'') {
-                return account_str.parse::<u32>().ok();
-            }
-        }
+    let mut parts = keypath.split('/');
+    if parts.next() != Some("m") || parts.next() != Some("44'") {
+        return None;
     }
-    None
+    // Skip cointype; the next segment is the account.
+    parts.next()?;
+    let account_part = parts.next()?;
+    let account_str = account_part.strip_suffix('\'')?;
+    account_str.parse::<u32>().ok()
 }
 
 /// Find the account key ID based on account ID
@@ -507,7 +507,7 @@ pub fn initialize_address_registry(
         registry.register(addr_id, address_metadata.key_id);
     }
 
-    // Step 2: For each known transparent address, try to find its account
+    // Step 2a: For each known transparent address, try to find its account
     for zcashd_address in wallet.address_names().keys() {
         // Create an AddressId for this transparent address
         let addr_id = AddressId::Transparent(zcashd_address.clone().into());
@@ -518,6 +518,35 @@ pub fn initialize_address_registry(
         {
             registry.register(addr_id, account_id);
         }
+    }
+
+    // Step 2b: Register HD-derived keypair addresses that aren't labeled
+    // in `address_names`. zcashd usually adds derived addresses to the
+    // address book, but imported HD keys (or older wallets) may have
+    // keypairs whose addresses never made it there. The HD keypath links
+    // each such address to its unified account.
+    let network = wallet.network();
+    for keypair in wallet.keys().keypairs() {
+        let Some(hd_path) = keypair.metadata().hd_keypath() else {
+            continue;
+        };
+        let Some(account_id) = extract_account_id_from_keypath(hd_path) else {
+            continue;
+        };
+        let Some(account_key_id) = find_account_key_id_by_account_id(unified_accounts, account_id)
+        else {
+            continue;
+        };
+        let pk = PublicKey::from_slice(keypair.pubkey().as_slice())
+            .context("parsing transparent public key from keypair")?;
+        #[allow(deprecated)]
+        let TransparentAddress::PublicKeyHash(hash) = pubkey_to_address(&pk) else {
+            unreachable!("pubkey_to_address always returns PublicKeyHash");
+        };
+        let addr_str =
+            ZcashAddress::from_transparent_p2pkh(address_network_from_zewif(network), hash)
+                .to_string();
+        registry.register(AddressId::Transparent(addr_str), account_key_id);
     }
 
     // Step 3: For each known sapling address, try to find its account

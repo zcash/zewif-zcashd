@@ -94,9 +94,9 @@ checksum = "89e25b6adfb930f02d1981565a6e5d9c547ac15a96606256d3b59040e5cd4ca3"
 
 [[package]]
 name = "bc-components"
-version = "0.21.0"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "350378302837b7b02d5f09eccfcaba9e33da63a4502ada497b7e48ad4c0ade73"
+checksum = "6077faa2e784ba4d60340f87d210c9c88bffd61384e33fb212895f0a912eb775"
 dependencies = [
  "anyhow",
  "bc-crypto",
@@ -106,11 +106,11 @@ dependencies = [
  "dcbor",
  "hex",
  "miniz_oxide",
- "paste",
  "pqcrypto-mldsa",
  "pqcrypto-mlkem",
  "pqcrypto-traits",
  "rand_core",
+ "ssh-agent-client-rs",
  "ssh-key",
  "sskr",
  "url",
@@ -137,15 +137,15 @@ dependencies = [
  "scrypt",
  "secp256k1 0.30.0",
  "sha2",
- "thiserror",
+ "thiserror 1.0.69",
  "x25519-dalek",
 ]
 
 [[package]]
 name = "bc-envelope"
-version = "0.28.0"
+version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38290e31247fd6a47d34568c7b05cb9bde4976405c1aa0b8f73f6349c130176f"
+checksum = "8a405ac045fd75c54b31fca2df85c38b73b0824bce893faa77154dbefb47dbad"
 dependencies = [
  "anyhow",
  "bc-components",
@@ -159,7 +159,7 @@ dependencies = [
  "known-values",
  "paste",
  "ssh-key",
- "thiserror",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -184,14 +184,14 @@ checksum = "3b6bdb46e87c24147d929cd78a93316ac118284825babeec47becd00395ee9eb"
 dependencies = [
  "bc-crypto",
  "bc-rand",
- "thiserror",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
 name = "bc-tags"
-version = "0.2.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbfd44331570ae0d61d92f7d62408b215f6833da9c8d464eb09706a079363ce4"
+checksum = "f849b1705d71e8e1f744f47e66fdff09191b0c4bc06df5477855f155294407b5"
 dependencies = [
  "dcbor",
  "paste",
@@ -199,12 +199,12 @@ dependencies = [
 
 [[package]]
 name = "bc-ur"
-version = "0.9.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c65e33cfacc82d2e6ef819ac08e73a429de526a4b019135fddbd2e14477ec2b2"
+checksum = "c66cbdfcce5175fc68c809990927653535d9b7c28efc9bc301583867a2c2ffde"
 dependencies = [
  "dcbor",
- "thiserror",
+ "thiserror 1.0.69",
  "ur",
 ]
 
@@ -457,7 +457,7 @@ dependencies = [
  "js-sys",
  "num-traits",
  "wasm-bindgen",
- "windows-link",
+ "windows-link 0.1.1",
 ]
 
 [[package]]
@@ -623,16 +623,16 @@ dependencies = [
 
 [[package]]
 name = "dcbor"
-version = "0.19.1"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "402f083d3c2daef249d4c06ef827c8b743ab88536f73dae52201f4de5abb0354"
+checksum = "c9ee71342cca725c77c9fc7cb2e043ab41b130f36d53826b31cc6053a2899bf1"
 dependencies = [
  "anyhow",
  "chrono",
  "half",
  "hex",
  "paste",
- "thiserror",
+ "thiserror 1.0.69",
  "unicode-normalization",
 ]
 
@@ -668,6 +668,12 @@ dependencies = [
  "quote",
  "syn 2.0.101",
 ]
+
+[[package]]
+name = "doctest-file"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2db04e74f0a9a93103b50e90b96024c9b2bdca8bce6a632ec71b88736d3d359"
 
 [[package]]
 name = "document-features"
@@ -1179,6 +1185,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "interprocess"
+version = "2.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "069323743400cb7ab06a8fe5c1ed911d36b6919ec531661d034c89083629595b"
+dependencies = [
+ "doctest-file",
+ "libc",
+ "recvmsg",
+ "widestring",
+ "windows-sys",
+]
+
+[[package]]
 name = "itertools"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1223,9 +1242,9 @@ dependencies = [
 
 [[package]]
 name = "known-values"
-version = "0.4.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7c3c5085ed0cb90e914af0906adca5fd87dd4af28ab6dc254edca97eee23a73"
+checksum = "80d0b88b8b600c157b67d764cc28b56d90dc47b1a18ea8844d99e9773b107cba"
 dependencies = [
  "bc-components",
  "dcbor",
@@ -1801,6 +1820,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "recvmsg"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3edd4d5d42c92f0a659926464d4cce56b562761267ecf0f469d85b7de384175"
+
+[[package]]
 name = "reddsa"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1814,7 +1839,7 @@ dependencies = [
  "pasta_curves",
  "rand_core",
  "serde",
- "thiserror",
+ "thiserror 1.0.69",
  "zeroize",
 ]
 
@@ -1827,7 +1852,7 @@ dependencies = [
  "rand_core",
  "reddsa",
  "serde",
- "thiserror",
+ "thiserror 1.0.69",
  "zeroize",
 ]
 
@@ -2103,6 +2128,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ssh-agent-client-rs"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55e17f8c47c06666b1cffb0116555450c7ee46c4004701981208dd6f79850747"
+dependencies = [
+ "bytes",
+ "interprocess",
+ "signature",
+ "ssh-encoding",
+ "ssh-key",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "ssh-cipher"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2125,9 +2164,9 @@ dependencies = [
 
 [[package]]
 name = "ssh-key"
-version = "0.6.6"
+version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca9b366a80cf18bb6406f4cf4d10aebfb46140a8c0c33f666a144c5c76ecbafc"
+checksum = "3b86f5297f0f04d08cabaa0f6bff7cb6aec4d9c3b49d87990d63da9d9156a8c3"
 dependencies = [
  "dsa",
  "ed25519-dalek",
@@ -2155,7 +2194,7 @@ checksum = "5ac11f99ef5cbbbc90a1eeeb4425d53af1e3ef9ff279102c009f643be2058e25"
 dependencies = [
  "bc-rand",
  "bc-shamir",
- "thiserror",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2221,7 +2260,16 @@ version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
 dependencies = [
- "thiserror-impl",
+ "thiserror-impl 1.0.69",
+]
+
+[[package]]
+name = "thiserror"
+version = "2.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
+dependencies = [
+ "thiserror-impl 2.0.18",
 ]
 
 [[package]]
@@ -2229,6 +2277,17 @@ name = "thiserror-impl"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "2.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2467,6 +2526,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "widestring"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72069c3113ab32ab29e5584db3c6ec55d416895e60715417b5b883a357c3e471"
+
+[[package]]
 name = "windows-core"
 version = "0.61.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2474,7 +2539,7 @@ checksum = "4763c1de310c86d75a878046489e2e5ba02c649d185f21c67d4cf8a56d098980"
 dependencies = [
  "windows-implement",
  "windows-interface",
- "windows-link",
+ "windows-link 0.1.1",
  "windows-result",
  "windows-strings",
 ]
@@ -2508,12 +2573,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76840935b766e1b0a05c0066835fb9ec80071d4c09a16f6bd5f7e655e3c14c38"
 
 [[package]]
+name = "windows-link"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"
+
+[[package]]
 name = "windows-result"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c64fd11a4fd95df68efcfee5f44a294fe71b8bc6a91993e2791938abcc712252"
 dependencies = [
- "windows-link",
+ "windows-link 0.1.1",
 ]
 
 [[package]]
@@ -2522,7 +2593,16 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2ba9642430ee452d5a7aa78d72907ebe8cfda358e8cb7918a2050581322f97"
 dependencies = [
- "windows-link",
+ "windows-link 0.1.1",
+]
+
+[[package]]
+name = "windows-sys"
+version = "0.61.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
+dependencies = [
+ "windows-link 0.2.1",
 ]
 
 [[package]]
@@ -2802,7 +2882,7 @@ dependencies = [
 [[package]]
 name = "zewif"
 version = "0.1.0"
-source = "git+https://github.com/nuttycom/zewif.git?rev=8f005a6f5a189815dc08821f99cfe7e8af4e7f62#8f005a6f5a189815dc08821f99cfe7e8af4e7f62"
+source = "git+https://github.com/zcash/zewif.git?rev=798d7b3554ebada05bea63b67ee66f9c2558a21a#798d7b3554ebada05bea63b67ee66f9c2558a21a"
 dependencies = [
  "anyhow",
  "bc-components",
@@ -2828,6 +2908,7 @@ dependencies = [
  "orchard",
  "ripemd",
  "sapling-crypto",
+ "secp256k1 0.27.0",
  "sha2",
  "uuid",
  "zcash_address",

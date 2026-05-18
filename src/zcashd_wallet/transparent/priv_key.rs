@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::{Result, anyhow, bail};
 
 use zewif::Data;
 
@@ -25,6 +25,59 @@ impl PrivKey {
 
     pub fn hash(&self) -> u256 {
         self.hash
+    }
+
+    /// Extracts the 32-byte secp256k1 scalar from the SEC1 `EC PRIVATE KEY`
+    /// DER blob stored by `zcashd`.
+    ///
+    /// Note: This could be eliminated if we used `Key::der_decode()` from
+    /// zcash_keys 0.10.1, but this crate is intentionally pinned to
+    /// zcash_keys 0.4.0 for compatibility with zcashd's dependencies.
+    pub fn secp256k1_scalar(&self) -> Result<[u8; 32]> {
+        let bytes = self.as_slice();
+        let mut cursor = 0usize;
+
+        if bytes.get(cursor).copied() != Some(0x30) {
+            bail!("PrivKey: expected outer SEQUENCE tag (0x30)");
+        }
+        cursor += 1;
+
+        // Skip the SEQUENCE length octets. Short form: a single byte < 0x80.
+        // Long form: the first byte's low 7 bits give the number of length
+        // octets that follow. (Indefinite form `0x80` is prohibited by DER
+        // and falls through to the tag mismatch below.)
+        let len_first = *bytes
+            .get(cursor)
+            .ok_or_else(|| anyhow!("PrivKey: truncated SEQUENCE length"))?;
+        cursor += 1;
+        if len_first & 0x80 != 0 {
+            let n = (len_first & 0x7f) as usize;
+            cursor = cursor
+                .checked_add(n)
+                .ok_or_else(|| anyhow!("PrivKey: SEQUENCE length overflow"))?;
+        }
+
+        // INTEGER version, value 1.
+        if bytes.get(cursor..cursor.saturating_add(3)) != Some(&[0x02, 0x01, 0x01][..]) {
+            bail!("PrivKey: expected INTEGER 1 version field after SEQUENCE");
+        }
+        cursor += 3;
+
+        // OCTET STRING(32) holding the private scalar.
+        if bytes.get(cursor..cursor.saturating_add(2)) != Some(&[0x04, 0x20][..]) {
+            bail!("PrivKey: expected OCTET STRING(32) holding private scalar");
+        }
+        cursor += 2;
+
+        let end = cursor
+            .checked_add(32)
+            .ok_or_else(|| anyhow!("PrivKey: scalar offset overflow"))?;
+        let scalar_bytes = bytes
+            .get(cursor..end)
+            .ok_or_else(|| anyhow!("PrivKey: OCTET STRING(32) truncated"))?;
+        let mut scalar = [0u8; 32];
+        scalar.copy_from_slice(scalar_bytes);
+        Ok(scalar)
     }
 }
 
@@ -55,5 +108,105 @@ impl Parse for PrivKey {
         let data = parse!(p, data = length, "PrivKey")?;
         let hash = parse!(p, "PrivKey hash")?;
         Ok(Self { data, hash })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use zewif::Data;
+
+    fn make_compressed_blob(scalar: [u8; 32]) -> Data {
+        // 30 81 D3 (SEQ 211) + 02 01 01 (INTEGER 1) + 04 20 <scalar> + filler to 214 bytes
+        let mut blob = vec![0x30, 0x81, 0xD3, 0x02, 0x01, 0x01, 0x04, 0x20];
+        blob.extend_from_slice(&scalar);
+        blob.resize(214, 0xAA);
+        Data::from_slice(&blob)
+    }
+
+    fn make_uncompressed_blob(scalar: [u8; 32]) -> Data {
+        // 30 82 01 13 (SEQ 275) + 02 01 01 (INTEGER 1) + 04 20 <scalar> + filler to 279 bytes
+        let mut blob = vec![0x30, 0x82, 0x01, 0x13, 0x02, 0x01, 0x01, 0x04, 0x20];
+        blob.extend_from_slice(&scalar);
+        blob.resize(279, 0xBB);
+        Data::from_slice(&blob)
+    }
+
+    #[test]
+    fn extracts_scalar_from_compressed_blob() {
+        let scalar = [0x42u8; 32];
+        let pk = PrivKey {
+            data: make_compressed_blob(scalar),
+            hash: u256::default(),
+        };
+        assert_eq!(pk.secp256k1_scalar().unwrap(), scalar);
+    }
+
+    #[test]
+    fn extracts_scalar_from_uncompressed_blob() {
+        let scalar = [0x99u8; 32];
+        let pk = PrivKey {
+            data: make_uncompressed_blob(scalar),
+            hash: u256::default(),
+        };
+        assert_eq!(pk.secp256k1_scalar().unwrap(), scalar);
+    }
+
+    #[test]
+    fn rejects_blob_without_marker() {
+        let pk = PrivKey {
+            data: Data::from_slice(&vec![0u8; 214]),
+            hash: u256::default(),
+        };
+        assert!(pk.secp256k1_scalar().is_err());
+    }
+
+    #[test]
+    fn rejects_blob_with_marker_at_wrong_offset() {
+        // A blob whose outer shape is *not* a valid SEC1 SEQUENCE, but which
+        // contains the `02 01 01 04 20` byte sequence somewhere in its body.
+        // A naive window-search would return the 32 bytes following that
+        // sequence; the structural parser must reject because byte 0 is not
+        // the SEQUENCE tag.
+        let mut data = vec![0xff; 10];
+        data.extend_from_slice(&[0x02, 0x01, 0x01, 0x04, 0x20]);
+        data.extend_from_slice(&[0x55; 32]);
+        data.resize(214, 0xAA);
+        let pk = PrivKey {
+            data: Data::from_slice(&data),
+            hash: u256::default(),
+        };
+        assert!(pk.secp256k1_scalar().is_err());
+    }
+
+    #[test]
+    fn extracts_scalar_with_short_form_length() {
+        // Synthetic blob using DER short-form SEQUENCE length (body < 128).
+        // Realistic zcashd blobs always use long form, but the parser should
+        // handle both.
+        let scalar = [0x77u8; 32];
+        let mut blob = vec![0x30, 50];
+        blob.extend_from_slice(&[0x02, 0x01, 0x01, 0x04, 0x20]);
+        blob.extend_from_slice(&scalar);
+        blob.resize(2 + 50, 0xCC);
+        let pk = PrivKey {
+            data: Data::from_slice(&blob),
+            hash: u256::default(),
+        };
+        assert_eq!(pk.secp256k1_scalar().unwrap(), scalar);
+    }
+
+    #[test]
+    fn rejects_blob_with_wrong_version_integer() {
+        // SEQUENCE prologue is valid, but the INTEGER version is 2 instead of
+        // 1 — RFC 5915 only defines version 1, so this must be rejected.
+        let mut blob = vec![0x30, 0x81, 0xD3, 0x02, 0x01, 0x02, 0x04, 0x20];
+        blob.extend_from_slice(&[0x33; 32]);
+        blob.resize(214, 0xAA);
+        let pk = PrivKey {
+            data: Data::from_slice(&blob),
+            hash: u256::default(),
+        };
+        assert!(pk.secp256k1_scalar().is_err());
     }
 }
