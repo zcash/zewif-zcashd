@@ -21,11 +21,13 @@ use crate::{
         sapling::{SaplingKey, SaplingKeys, SaplingZPaymentAddress},
         sprout::{SproutKeys, SproutPaymentAddress, SproutSpendingKey},
         transparent::{
-            KeyPair, KeyPoolEntry, Keys, PrivKey, PubKey, WalletKey, WalletKeys, WatchScript,
+            KeyPair, KeyPoolEntry, Keys, PrivKey, PubKey, ScriptId, WalletKey, WalletKeys,
+            WatchScript,
         },
         u252,
     },
 };
+use zewif::Script;
 
 #[derive(Debug)]
 pub struct ZcashdParser<'a> {
@@ -78,6 +80,7 @@ impl<'a> ZcashdParser<'a> {
         // csapzkey
 
         // cscript
+        let cscripts = self.parse_cscripts()?;
 
         // czkey
 
@@ -182,6 +185,7 @@ impl<'a> ZcashdParser<'a> {
             bestblock_nomerkle,
             bestblock,
             client_version,
+            cscripts,
             default_key,
             key_pool,
             keys,
@@ -593,6 +597,28 @@ impl<'a> ZcashdParser<'a> {
         Ok(orchard_note_commitment_tree)
     }
 
+    fn parse_cscripts(&self) -> Result<HashMap<ScriptId, Script>> {
+        let mut cscripts = HashMap::new();
+        if !self.dump.has_keys_for_keyname("cscript") {
+            return Ok(cscripts);
+        }
+        let records = self
+            .dump
+            .records_for_keyname("cscript")
+            .context("Getting 'cscript' records")?;
+        for (key, value) in records {
+            let script_id = parse!(buf = &key.data, ScriptId, "cscript ScriptID")?;
+            let script = parse!(buf = value.as_data(), Script, "cscript redeem script")?;
+            if cscripts.contains_key(&script_id) {
+                bail!("Duplicate cscript ScriptID found: {:?}", script_id);
+            }
+            cscripts.insert(script_id, script);
+
+            self.mark_key_parsed(&key);
+        }
+        Ok(cscripts)
+    }
+
     fn parse_watch_scripts(&self) -> Result<Vec<WatchScript>> {
         if !self.dump.has_keys_for_keyname("watchs") {
             return Ok(Vec::new());
@@ -677,7 +703,10 @@ mod tests {
     use zewif::{Data, Network};
 
     use super::*;
-    use crate::{BDBDump, ZcashdDump, zcashd_wallet::transparent::WatchScriptKind};
+    use crate::{
+        BDBDump, ZcashdDump,
+        zcashd_wallet::{transparent::WatchScriptKind, u160},
+    };
 
     /// Serializes a BDB key as a length-prefixed keyname followed by raw key
     /// bytes — the exact wire format `ZcashdDump::from_bdb_dump` consumes.
@@ -692,12 +721,70 @@ mod tests {
         Data::from_slice(&bytes)
     }
 
+    /// Serializes a `Script` payload — CompactSize length followed by the
+    /// script bytes — using the same restriction on short lengths.
+    fn make_script_value(script: &[u8]) -> Data {
+        assert!(script.len() < 253, "test helper only supports short scripts");
+        let mut bytes = Vec::with_capacity(1 + script.len());
+        bytes.push(script.len() as u8);
+        bytes.extend_from_slice(script);
+        Data::from_slice(&bytes)
+    }
+
     fn dump_with_records(records: Vec<(Data, Data)>) -> ZcashdDump {
         let bdb = BDBDump {
             header_records: HashMap::new(),
             data_records: records.into_iter().collect(),
         };
         ZcashdDump::from_bdb_dump(&bdb, true).expect("from_bdb_dump")
+    }
+
+    /// Verifies `parse_cscripts` plumbs BDB records all the way through to a
+    /// `HashMap<ScriptId, Script>` keyed by the 20-byte script hash carried in
+    /// the BDB key, with the value-side bytes preserved verbatim.
+    #[test]
+    fn parse_cscripts_returns_scriptid_to_script_map() {
+        let script_id_bytes = [0x42u8; 20];
+        let redeem_script = [0xa9, 0x14, 0xff, 0x11, 0x87];
+
+        let bdb_key = make_bdb_key("cscript", &script_id_bytes);
+        let bdb_value = make_script_value(&redeem_script);
+
+        let dump = dump_with_records(vec![(bdb_key, bdb_value)]);
+        let parser = ZcashdParser::new(&dump, true);
+
+        let cscripts = parser.parse_cscripts().expect("parse_cscripts");
+        assert_eq!(cscripts.len(), 1);
+
+        // Recover the ScriptId from the same bytes used in the BDB key and
+        // look it up.
+        let script_id = ScriptId::from(u160::from_slice(&script_id_bytes).unwrap());
+        let script = cscripts.get(&script_id).expect("script for id");
+        assert_eq!(script.as_ref(), &redeem_script[..]);
+    }
+
+    /// Multiple `cscript` records with distinct `ScriptId`s all appear in
+    /// the resulting map, keyed correctly.
+    #[test]
+    fn parse_cscripts_collects_multiple_records() {
+        let id_a = [0x11u8; 20];
+        let id_b = [0x22u8; 20];
+        let script_a = [0xa9, 0x14, 0x01, 0x87];
+        let script_b = [0x76, 0xa9, 0x14, 0x02];
+
+        let dump = dump_with_records(vec![
+            (make_bdb_key("cscript", &id_a), make_script_value(&script_a)),
+            (make_bdb_key("cscript", &id_b), make_script_value(&script_b)),
+        ]);
+        let parser = ZcashdParser::new(&dump, true);
+
+        let cscripts = parser.parse_cscripts().expect("parse_cscripts");
+        assert_eq!(cscripts.len(), 2);
+
+        let sid_a = ScriptId::from(u160::from_slice(&id_a).unwrap());
+        let sid_b = ScriptId::from(u160::from_slice(&id_b).unwrap());
+        assert_eq!(cscripts.get(&sid_a).unwrap().as_ref(), &script_a[..]);
+        assert_eq!(cscripts.get(&sid_b).unwrap().as_ref(), &script_b[..]);
     }
 
     /// Verifies `parse_watch_scripts` plumbs BDB records through to
@@ -759,5 +846,16 @@ mod tests {
             other => panic!("expected Other, got {:?}", other),
         }
         assert!(entry.to_address_string(Network::Main).is_none());
+    }
+
+    /// When neither key is present in the dump, both parsers must return
+    /// empty collections rather than erroring.
+    #[test]
+    fn parsers_return_empty_when_keys_absent() {
+        let dump = dump_with_records(vec![]);
+        let parser = ZcashdParser::new(&dump, true);
+
+        assert!(parser.parse_cscripts().expect("parse_cscripts").is_empty());
+        assert!(parser.parse_watch_scripts().expect("parse_watch_scripts").is_empty());
     }
 }

@@ -46,7 +46,7 @@
 
 - [ ] ckey
 - [ ] csapzkey
-- [ ] cscript
+- [x] cscript
 - [ ] czkey
 - [ ] destdata
 - [ ] hdseed

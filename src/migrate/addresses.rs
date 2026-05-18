@@ -82,6 +82,16 @@ pub fn convert_transparent_addresses(
         }
     }
 
+    // `cscripts` records carry the redeem script for each P2SH address the
+    // wallet has registered. The script's `ScriptId` is the hash-160 of the
+    // redeem script, which is also exactly the script-hash encoded in the
+    // P2SH t-address — so we can key by the encoded address and recover the
+    // redeem script for spending.
+    for (script_id, script) in wallet.cscripts() {
+        let addr_str = script_id.to_string(network);
+        merged.record_redeem_script(&addr_str, script.clone());
+    }
+
     // `address_purposes` only annotates existing entries; addresses present
     // *only* in `address_purposes` are intentionally not introduced here.
     for (addr, purpose) in wallet.address_purposes() {

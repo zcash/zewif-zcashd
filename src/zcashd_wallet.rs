@@ -28,12 +28,12 @@ pub mod sprout;
 pub mod transparent;
 
 use std::collections::HashMap;
-use zewif::{Bip39Mnemonic, Network, TxId, sapling::SaplingIncomingViewingKey};
+use zewif::{Bip39Mnemonic, Network, Script, TxId, sapling::SaplingIncomingViewingKey};
 
 use orchard::OrchardNoteCommitmentTree;
 use sapling::{SaplingKeys, SaplingZPaymentAddress};
 use sprout::SproutKeys;
-use transparent::{KeyPoolEntry, Keys, PubKey, WalletKeys, WatchScript};
+use transparent::{KeyPoolEntry, Keys, PubKey, ScriptId, WalletKeys, WatchScript};
 
 #[derive(Debug)]
 pub struct ZcashdWallet {
@@ -42,6 +42,7 @@ pub struct ZcashdWallet {
     bestblock_nomerkle: Option<BlockLocator>,
     bestblock: BlockLocator,
     client_version: ClientVersion,
+    cscripts: HashMap<ScriptId, Script>,
     default_key: PubKey,
     key_pool: HashMap<i64, KeyPoolEntry>,
     keys: Keys,
@@ -71,6 +72,7 @@ impl ZcashdWallet {
         bestblock_nomerkle: Option<BlockLocator>,
         bestblock: BlockLocator,
         client_version: ClientVersion,
+        cscripts: HashMap<ScriptId, Script>,
         default_key: PubKey,
         key_pool: HashMap<i64, KeyPoolEntry>,
         keys: Keys,
@@ -97,6 +99,7 @@ impl ZcashdWallet {
             bestblock_nomerkle,
             bestblock,
             client_version,
+            cscripts,
             default_key,
             key_pool,
             keys,
@@ -136,6 +139,13 @@ impl ZcashdWallet {
 
     pub fn client_version(&self) -> &ClientVersion {
         &self.client_version
+    }
+
+    /// Redeem scripts imported via the `importaddress` RPC and stored under the
+    /// `cscript` BDB key, keyed by their 20-byte `CScriptID` (RIPEMD-160 of
+    /// SHA-256 of the script).
+    pub fn cscripts(&self) -> &HashMap<ScriptId, Script> {
+        &self.cscripts
     }
 
     pub fn default_key(&self) -> &PubKey {
