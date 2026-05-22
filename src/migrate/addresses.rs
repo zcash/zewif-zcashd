@@ -101,6 +101,8 @@ pub fn convert_transparent_addresses(
         merged.record_purpose(&addr_str, purpose);
     }
 
+    // Sort by encoded address so the migrated wallet is reproducible across
+    // runs — `MergeMap::into_entries` already returns entries in this order.
     for (addr_str, info) in merged.into_entries() {
         emit_transparent_address(
             default_account,
@@ -211,8 +213,11 @@ impl MergeMap {
         }
     }
 
-    fn into_entries(self) -> HashMap<String, EmitInfo> {
-        self.entries
+    /// Consume the map and return entries sorted by encoded address.
+    fn into_entries(self) -> Vec<(String, EmitInfo)> {
+        let mut entries: Vec<_> = self.entries.into_iter().collect();
+        entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+        entries
     }
 }
 
@@ -766,6 +771,19 @@ mod tests {
             m.record_purpose(ADDR, "receive");
             m.record_purpose(ADDR, "send");
             assert_eq!(m.entries[ADDR].purpose.as_deref(), Some("receive"));
+        }
+
+        #[test]
+        fn into_entries_returns_sorted_by_address() {
+            // `convert_transparent_addresses` relies on `into_entries`
+            // returning addresses in a deterministic order so the migrated
+            // wallet is reproducible across runs.
+            let mut m = MergeMap::default();
+            m.ensure_entry("t1zzz");
+            m.ensure_entry("t1aaa");
+            m.ensure_entry("t1mmm");
+            let addrs: Vec<String> = m.into_entries().into_iter().map(|(a, _)| a).collect();
+            assert_eq!(addrs, vec!["t1aaa", "t1mmm", "t1zzz"]);
         }
     }
 }
