@@ -96,6 +96,9 @@ pub fn convert_transparent_addresses(
 
     // `address_purposes` only annotates existing entries; addresses present
     // *only* in `address_purposes` are intentionally not introduced here.
+    // `MergeMap` defers purpose application until `into_entries`, so this
+    // loop can run in any order relative to the others without changing the
+    // outcome.
     for (addr, purpose) in wallet.address_purposes() {
         let addr_str: String = addr.clone().into();
         merged.record_purpose(&addr_str, purpose);
@@ -134,9 +137,16 @@ struct EmitInfo {
 /// contribution wins, and any subsequent contribution that disagrees is
 /// reported to stderr and dropped. This keeps the migration output stable
 /// against source ordering — see `merge_tests::source_order_does_not_matter`.
+///
+/// Purposes are deferred: `record_purpose` only stages contributions, and
+/// they are folded into matching entries by `into_entries`. This means a
+/// purpose recorded before any other contribution for the same address is
+/// retained until either an entry appears (and the purpose attaches to it)
+/// or finalization runs (and a purpose with no entry is dropped silently).
 #[derive(Default)]
 struct MergeMap {
     entries: HashMap<String, EmitInfo>,
+    pending_purposes: Vec<(String, String)>,
 }
 
 impl MergeMap {
@@ -197,24 +207,38 @@ impl MergeMap {
     }
 
     fn record_purpose(&mut self, addr: &str, purpose: &str) {
-        // Purposes only annotate entries contributed by some other source.
-        let Some(entry) = self.entries.get_mut(addr) else {
-            return;
-        };
-        match &entry.purpose {
-            Some(existing) if existing != purpose => {
-                eprintln!(
-                    "warning: address {} has conflicting purposes ({:?} vs {:?}); keeping {:?}",
-                    addr, existing, purpose, existing,
-                );
+        // Stage the purpose for application during `into_entries`. Deferring
+        // here means callers can run the address-purposes pass in any order
+        // relative to the entry-creating passes without losing annotations.
+        self.pending_purposes
+            .push((addr.to_string(), purpose.to_string()));
+    }
+
+    /// Apply all staged purposes to their matching entries. Purposes whose
+    /// address never received an entry-creating contribution are dropped
+    /// silently — `address_purposes` is purely an annotation source and
+    /// must not introduce addresses on its own.
+    fn finalize_purposes(&mut self) {
+        for (addr, purpose) in self.pending_purposes.drain(..) {
+            let Some(entry) = self.entries.get_mut(&addr) else {
+                continue;
+            };
+            match &entry.purpose {
+                Some(existing) if existing != &purpose => {
+                    eprintln!(
+                        "warning: address {} has conflicting purposes ({:?} vs {:?}); keeping {:?}",
+                        addr, existing, purpose, existing,
+                    );
+                }
+                Some(_) => {}
+                None => entry.purpose = Some(purpose),
             }
-            Some(_) => {}
-            None => entry.purpose = Some(purpose.to_string()),
         }
     }
 
     /// Consume the map and return entries sorted by encoded address.
-    fn into_entries(self) -> Vec<(String, EmitInfo)> {
+    fn into_entries(mut self) -> Vec<(String, EmitInfo)> {
+        self.finalize_purposes();
         let mut entries: Vec<_> = self.entries.into_iter().collect();
         entries.sort_by(|(a, _), (b, _)| a.cmp(b));
         entries
@@ -627,6 +651,7 @@ mod tests {
             m.ensure_entry(ADDR);
             m.record_redeem_script(ADDR, make_script(&[0xa9, 0x14]));
             m.record_purpose(ADDR, "receive");
+            m.finalize_purposes();
 
             let info = &m.entries[ADDR];
             assert_eq!(info.name.as_deref(), Some("alice"));
@@ -641,8 +666,12 @@ mod tests {
 
         #[test]
         fn source_order_does_not_matter() {
-            // Build two maps with the same four contributions in opposite
-            // orders; the resulting entries must be field-by-field equal.
+            // Build two maps with the same five contributions in opposite
+            // orders. With deferred purposes, the early `record_purpose` in
+            // `b` no longer needs a replay — `into_entries` (and the
+            // `finalize_purposes` it calls) folds it in regardless of when
+            // it arrived. The resulting entries must be field-by-field
+            // equal.
             let mut a = MergeMap::default();
             a.record_name(ADDR, "alice");
             a.record_spend_authority(ADDR, TransparentSpendAuthority::Derived);
@@ -651,14 +680,14 @@ mod tests {
             a.record_purpose(ADDR, "receive");
 
             let mut b = MergeMap::default();
-            b.record_purpose(ADDR, "receive"); // dropped — no entry yet
+            b.record_purpose(ADDR, "receive"); // staged, applied at finalize
             b.record_redeem_script(ADDR, make_script(&[0xab]));
             b.record_spend_authority(ADDR, TransparentSpendAuthority::Derived);
             b.record_derivation_info(ADDR, derivation(0, 5));
             b.record_name(ADDR, "alice");
-            // Replay purposes after entries exist (matches caller ordering).
-            b.record_purpose(ADDR, "receive");
 
+            a.finalize_purposes();
+            b.finalize_purposes();
             let ea = &a.entries[ADDR];
             let eb = &b.entries[ADDR];
             assert_eq!(ea.name, eb.name);
@@ -759,9 +788,12 @@ mod tests {
 
         #[test]
         fn purpose_without_existing_entry_is_dropped() {
+            // A purpose with no entry-creating contribution is staged but
+            // never materializes as an entry — `into_entries` returns
+            // nothing.
             let mut m = MergeMap::default();
             m.record_purpose(ADDR, "receive");
-            assert!(!m.entries.contains_key(ADDR));
+            assert!(m.into_entries().is_empty());
         }
 
         #[test]
@@ -770,6 +802,7 @@ mod tests {
             m.record_name(ADDR, "alice");
             m.record_purpose(ADDR, "receive");
             m.record_purpose(ADDR, "send");
+            m.finalize_purposes();
             assert_eq!(m.entries[ADDR].purpose.as_deref(), Some("receive"));
         }
 
