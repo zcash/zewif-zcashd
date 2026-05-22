@@ -42,19 +42,41 @@ impl PrivKey {
         }
         cursor += 1;
 
-        // Skip the SEQUENCE length octets. Short form: a single byte < 0x80.
-        // Long form: the first byte's low 7 bits give the number of length
-        // octets that follow. (Indefinite form `0x80` is prohibited by DER
-        // and falls through to the tag mismatch below.)
+        // Parse the SEQUENCE length octets. Short form: a single byte < 0x80
+        // gives the body length directly. Long form: the first byte's low 7
+        // bits give the number of length octets that follow, big-endian.
+        // (Indefinite form `0x80` is prohibited by DER and falls through to
+        // the tag mismatch below.)
         let len_first = *bytes
             .get(cursor)
             .ok_or_else(|| anyhow!("PrivKey: truncated SEQUENCE length"))?;
         cursor += 1;
-        if len_first & 0x80 != 0 {
+        let body_len: usize = if len_first & 0x80 == 0 {
+            len_first as usize
+        } else {
             let n = (len_first & 0x7f) as usize;
-            cursor = cursor
-                .checked_add(n)
-                .ok_or_else(|| anyhow!("PrivKey: SEQUENCE length overflow"))?;
+            let len_bytes = bytes
+                .get(cursor..cursor.saturating_add(n))
+                .ok_or_else(|| anyhow!("PrivKey: truncated long-form SEQUENCE length"))?;
+            cursor += n;
+            let mut acc: usize = 0;
+            for &b in len_bytes {
+                acc = acc
+                    .checked_mul(256)
+                    .and_then(|a| a.checked_add(b as usize))
+                    .ok_or_else(|| anyhow!("PrivKey: SEQUENCE length overflow"))?;
+            }
+            acc
+        };
+        let body_end = cursor
+            .checked_add(body_len)
+            .ok_or_else(|| anyhow!("PrivKey: SEQUENCE end overflow"))?;
+        if body_end != bytes.len() {
+            bail!(
+                "PrivKey: SEQUENCE length {} does not match length of blob remainder ({} bytes)",
+                body_len,
+                bytes.len().saturating_sub(cursor),
+            );
         }
 
         // INTEGER version, value 1.
@@ -194,6 +216,39 @@ mod tests {
             hash: u256::default(),
         };
         assert_eq!(pk.secp256k1_scalar().unwrap(), scalar);
+    }
+
+    #[test]
+    fn rejects_blob_with_undersized_sequence_length() {
+        // SEQUENCE prologue claims body length 50, but the blob actually
+        // extends to 214 bytes. Without the length-coverage check, the parser
+        // would happily walk past the declared end and find the INTEGER tag
+        // anyway; the check makes the structural mismatch surface here.
+        let mut blob = vec![0x30, 50];
+        blob.extend_from_slice(&[0x02, 0x01, 0x01, 0x04, 0x20]);
+        blob.extend_from_slice(&[0x77; 32]);
+        blob.resize(214, 0xAA);
+        let pk = PrivKey {
+            data: Data::from_slice(&blob),
+            hash: u256::default(),
+        };
+        assert!(pk.secp256k1_scalar().is_err());
+    }
+
+    #[test]
+    fn rejects_blob_with_oversized_sequence_length() {
+        // SEQUENCE prologue claims body length 300, but the blob only
+        // contains 214 bytes total. The length-coverage check rejects
+        // declarations that run past the blob end, symmetric with the
+        // undersized case above.
+        let mut blob = vec![0x30, 0x82, 0x01, 0x2C, 0x02, 0x01, 0x01, 0x04, 0x20];
+        blob.extend_from_slice(&[0x77; 32]);
+        blob.resize(214, 0xAA);
+        let pk = PrivKey {
+            data: Data::from_slice(&blob),
+            hash: u256::default(),
+        };
+        assert!(pk.secp256k1_scalar().is_err());
     }
 
     #[test]
