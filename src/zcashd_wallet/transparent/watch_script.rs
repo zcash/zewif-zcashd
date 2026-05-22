@@ -65,6 +65,10 @@ impl WatchScriptKind {
         // 0x02 or 0x03. Without the sign-byte check, arbitrary 33-byte blobs
         // wrapped in PUSHBYTES_33/OP_CHECKSIG would classify as P2PK even
         // though they cannot be valid compressed pubkeys.
+        //
+        // PUSHBYTES_33 (0x21) is conveniently also the CompactSize encoding
+        // of 33, so `&script[..34]` is `[len][33 pubkey bytes]` — exactly the
+        // shape `PubKey::parse_buf` expects.
         if script.len() == 35
             && script[0] == PUSHBYTES_33
             && script[34] == OP_CHECKSIG
@@ -77,7 +81,9 @@ impl WatchScriptKind {
         }
 
         // P2PK (uncompressed): 0x41 <65 bytes> 0xac, with a SEC1 sign byte
-        // of 0x04.
+        // of 0x04. As with the compressed case above, PUSHBYTES_65 (0x41) is
+        // the CompactSize encoding of 65, so `&script[..66]` is the
+        // `[len][65 pubkey bytes]` shape `PubKey::parse_buf` expects.
         if script.len() == 67
             && script[0] == PUSHBYTES_65
             && script[66] == OP_CHECKSIG
