@@ -448,15 +448,32 @@ fn find_account_for_sapling_address(
 /// Extract the BIP-44 account ID from an HD key path, returning `None` for
 /// any path that does not match the canonical
 /// `m/44'/<cointype>'/<account>'/<type>/<idx>` shape. Requires `m/44'` as
-/// the leading two segments and a hardened, integer-parseable fourth
-/// segment (the account).
+/// the leading two segments, a hardened cointype matching one of Zcash's
+/// SLIP-44 values (133 for mainnet, 1 for testnet/regtest), and a hardened,
+/// integer-parseable fourth segment (the account).
+///
+/// The cointype check guards against linking an address to a unified account
+/// when its HD path is rooted in a different coin's slip-44 namespace — a
+/// scenario that should never arise in a well-formed `zcashd` wallet but
+/// would silently mis-route addresses if it did. We accept either Zcash
+/// cointype rather than threading the wallet's network through callers,
+/// since a mismatch between the path's cointype and the wallet's network
+/// is itself a separate corruption indicator that's unlikely to coexist
+/// with otherwise-well-formed keypair metadata.
 fn extract_account_id_from_keypath(keypath: &str) -> Option<u32> {
+    const ZEC_MAINNET_COIN_TYPE: u32 = 133;
+    const ZEC_TESTNET_COIN_TYPE: u32 = 1;
+
     let mut parts = keypath.split('/');
     if parts.next() != Some("m") || parts.next() != Some("44'") {
         return None;
     }
-    // Skip cointype; the next segment is the account.
-    parts.next()?;
+    let coin_part = parts.next()?;
+    let coin_str = coin_part.strip_suffix('\'')?;
+    let coin_type: u32 = coin_str.parse().ok()?;
+    if coin_type != ZEC_MAINNET_COIN_TYPE && coin_type != ZEC_TESTNET_COIN_TYPE {
+        return None;
+    }
     let account_part = parts.next()?;
     let account_str = account_part.strip_suffix('\'')?;
     account_str.parse::<u32>().ok()
@@ -564,4 +581,41 @@ pub fn initialize_address_registry(
     }
 
     Ok(registry)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keypath_accepts_mainnet_cointype() {
+        let account_id = extract_account_id_from_keypath("m/44'/133'/3'/0/5").unwrap();
+        assert_eq!(account_id, 3);
+    }
+
+    #[test]
+    fn keypath_accepts_testnet_cointype() {
+        let account_id = extract_account_id_from_keypath("m/44'/1'/7'/0/5").unwrap();
+        assert_eq!(account_id, 7);
+    }
+
+    #[test]
+    fn keypath_rejects_non_zcash_cointype() {
+        // BTC (0), ETH (60), and arbitrary other slip-44 values must not
+        // resolve to a Zcash account — refusing here prevents mis-routing
+        // an address whose HD path is rooted in another coin's namespace.
+        assert!(extract_account_id_from_keypath("m/44'/0'/0'/0/5").is_none());
+        assert!(extract_account_id_from_keypath("m/44'/60'/0'/0/5").is_none());
+        assert!(extract_account_id_from_keypath("m/44'/9999'/0'/0/5").is_none());
+    }
+
+    #[test]
+    fn keypath_rejects_non_hardened_cointype() {
+        assert!(extract_account_id_from_keypath("m/44'/133/0'/0/5").is_none());
+    }
+
+    #[test]
+    fn keypath_rejects_unparseable_cointype() {
+        assert!(extract_account_id_from_keypath("m/44'/abc'/0'/0/5").is_none());
+    }
 }
