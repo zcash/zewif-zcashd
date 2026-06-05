@@ -22,7 +22,7 @@ impl PubKey {
 
 impl std::fmt::Debug for PubKey {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "PubKey({:?})", &self.0)
+        write!(f, "PubKey({:?})", self.0)
     }
 }
 

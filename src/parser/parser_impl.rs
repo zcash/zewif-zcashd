@@ -117,34 +117,6 @@ pub trait ParseWithParam<P> {
     fn parse(p: &mut Parser, param: P) -> Result<Self>
     where
         Self: Sized;
-
-    /// Parses an instance of this type from a complete byte buffer,
-    /// using the provided parameter for context.
-    ///
-    /// This convenience method creates a `Parser` from the provided buffer,
-    /// parses the type with the parameter, and ensures that the entire buffer was consumed.
-    ///
-    /// # Arguments
-    /// * `buf` - The buffer containing the binary data to parse
-    /// * `param` - The parameter to use during parsing
-    /// * `trace` - Whether to enable debug tracing during parsing
-    ///
-    /// # Returns
-    /// The parsed instance if successful
-    ///
-    /// # Errors
-    /// Returns an error if parsing fails or if there are unconsumed bytes in the buffer
-    #[allow(dead_code)]
-    fn parse_buf(buf: &dyn AsRef<[u8]>, param: P, trace: bool) -> Result<Self>
-    where
-        Self: Sized,
-    {
-        let mut p = Parser::new(&buf);
-        p.set_trace(trace);
-        let result = Self::parse(&mut p, param)?;
-        p.check_finished()?;
-        Ok(result)
-    }
 }
 
 /// A binary data stream parser for Zcash wallet and blockchain data.

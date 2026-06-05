@@ -1,5 +1,5 @@
 use anyhow::Result;
-use bridgetree::{BridgeTree, Position};
+use bridgetree::BridgeTree;
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::{
     collections::BTreeMap,
@@ -18,12 +18,25 @@ const ORCHARD_TREE_DEPTH: u8 = 32;
 
 /// A data structure holding chain positions for a single transaction.
 #[derive(Clone, Debug)]
-struct NotePositions {
+pub struct NotePositions {
     /// The height of the block containing the transaction.
     tx_height: BlockHeight,
     /// A map from the index of an Orchard action tracked by this wallet, to the position
     /// of the output note's commitment within the global Merkle tree.
     note_positions: BTreeMap<u32, incrementalmerkletree::Position>,
+}
+
+impl NotePositions {
+    /// The height of the block containing the transaction.
+    pub fn tx_height(&self) -> BlockHeight {
+        self.tx_height
+    }
+
+    /// A map from the index of an Orchard action tracked by this wallet, to the
+    /// position of the output note's commitment within the global Merkle tree.
+    pub fn note_positions(&self) -> &BTreeMap<u32, incrementalmerkletree::Position> {
+        &self.note_positions
+    }
 }
 
 /// Represents the complete Orchard note commitment tree
@@ -36,6 +49,23 @@ pub struct OrchardNoteCommitmentTree {
 
 impl OrchardNoteCommitmentTree {
     const NOTE_STATE_V1: u8 = 1;
+
+    /// The last checkpoint recorded in the commitment tree, if any.
+    pub fn last_checkpoint(&self) -> Option<BlockHeight> {
+        self.last_checkpoint
+    }
+
+    /// The Orchard note commitment tree as a [`BridgeTree`].
+    pub fn commitment_tree(
+        &self,
+    ) -> &BridgeTree<MerkleHashOrchard, BlockHeight, ORCHARD_TREE_DEPTH> {
+        &self.commitment_tree
+    }
+
+    /// The note positions tracked per transaction.
+    pub fn note_positions(&self) -> &[(TxId, NotePositions)] {
+        &self.note_positions
+    }
 
     fn read<R: Read>(mut reader: R) -> io::Result<Self> {
         match reader.read_u8()? {
@@ -71,14 +101,6 @@ impl OrchardNoteCommitmentTree {
                 unrecognized
             ))),
         }
-    }
-
-    /// Convert to Zewif IncremetalWitness format
-    fn extract_witness(
-        &self,
-        _position: Position,
-    ) -> zewif::IncrementalWitness<32, MerkleHashOrchard> {
-        todo!()
     }
 }
 
