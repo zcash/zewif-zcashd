@@ -41,18 +41,15 @@ faithfully requires:
 
 ## Usage
 
-```rust
-use std::path::Path;
-use zewif::BlockHeight;
-use zewif_zcashd::{BDBDump, ZcashdDump, ZcashdParser, migrate_to_zewif};
+See [`examples/read_wallet.rs`](examples/read_wallet.rs) for a runnable example
+that reads a `wallet.dat`, prints a summary, and migrates it to ZeWIF. It is
+also handy as a smoke test that real wallet files still parse after a patch:
 
-let bdb = BDBDump::from_file(Path::new("wallet.dat"))?;
-let dump = ZcashdDump::from_bdb_dump(&bdb, /* strict = */ true)?;
-let (wallet, _unparsed) = ZcashdParser::parse_dump(&dump)?;
-
-let export_height = BlockHeight::from_u32(2_400_000);
-let zewif = migrate_to_zewif(&wallet, export_height)?;
+```sh
+cargo run --example read_wallet -- /path/to/wallet.dat
 ```
+
+With no argument it defaults to `$HOME/.zcash/wallet.dat`.
 
 ## Layout
 
