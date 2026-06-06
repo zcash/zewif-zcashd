@@ -110,7 +110,7 @@ impl Parse for ParseTransaction {
                 // so it is essentially ephemeral as this parsing is only performed so that we can
                 // reencode the transaction without the remainder of the `CMerkleTx` and `CWalletTx`
                 // data.
-                zcash_primitives::consensus::BranchId::Nu5,
+                zcash_protocol::consensus::BranchId::Nu5,
             )?,
         ))
     }

@@ -8,12 +8,10 @@ use std::io::{self, Read};
 use bridgetree::{BridgeTree, Checkpoint, MerkleBridge};
 use incrementalmerkletree::{Address, Hashable, Level, Position};
 use zcash_encoding::{Optional, Vector};
-use zcash_primitives::{
-    consensus::BlockHeight,
-    merkle_tree::{
-        HashSer, read_address, read_leu64_usize, read_nonempty_frontier_v1, read_position,
-    },
+use zcash_primitives::merkle_tree::{
+    HashSer, read_address, read_leu64_usize, read_nonempty_frontier_v1, read_position,
 };
+use zcash_protocol::consensus::BlockHeight;
 
 const SER_V1: u8 = 1;
 const SER_V2: u8 = 2;

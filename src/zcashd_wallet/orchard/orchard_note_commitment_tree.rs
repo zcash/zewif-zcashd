@@ -8,7 +8,8 @@ use std::{
 
 use ::orchard::tree::MerkleHashOrchard;
 use zcash_encoding::{Optional, Vector};
-use zcash_primitives::{consensus::BlockHeight, merkle_tree::read_position, transaction::TxId};
+use zcash_primitives::{merkle_tree::read_position, transaction::TxId};
+use zcash_protocol::consensus::BlockHeight;
 
 use super::bridgetree_parsing::read_tree;
 use crate::parser::prelude::*;
