@@ -309,12 +309,11 @@ fn emit_transparent_address(
 
     if let (Some(registry), Some(accounts)) = (address_registry, accounts_map.as_mut()) {
         let addr_id = AddressId::Transparent(zcashd_address.into());
-        if let Some(account_id) = registry.find_account(&addr_id) {
-            if let Some(target_account) = accounts.get_mut(account_id) {
+        if let Some(account_id) = registry.find_account(&addr_id)
+            && let Some(target_account) = accounts.get_mut(account_id) {
                 target_account.add_address(zewif_address);
                 return;
             }
-        }
     }
 
     // No registry match: route to the default account. This is the correct
@@ -440,12 +439,11 @@ fn route_sapling_address(
 ) {
     if let (Some(registry), Some(accounts)) = (address_registry, accounts_map.as_mut()) {
         let addr_id = AddressId::Sapling(address_str.to_string());
-        if let Some(account_id) = registry.find_account(&addr_id) {
-            if let Some(target_account) = accounts.get_mut(account_id) {
+        if let Some(account_id) = registry.find_account(&addr_id)
+            && let Some(target_account) = accounts.get_mut(account_id) {
                 target_account.add_address(zewif_address);
                 return;
             }
-        }
     }
     default_account.add_address(zewif_address);
 }
@@ -520,25 +518,22 @@ pub fn convert_unified_addresses(
             let addr_id = AddressId::Unified(ua_str[0..20].to_string());
 
             if let Some(account_id) = registry.find_account(&addr_id) {
-                if let Some(accounts) = accounts_map.as_mut() {
-                    if let Some(target_account) = accounts.get_mut(account_id) {
+                if let Some(accounts) = accounts_map.as_mut()
+                    && let Some(target_account) = accounts.get_mut(account_id) {
                         // Add to the specified account
                         target_account.add_address(zewif_address.clone());
                         assigned = true;
                     }
-                }
             } else {
                 // Try with the Unified variant if UnifiedAccountAddress didn't work
                 let addr_id = AddressId::Unified(ua_str);
-                if let Some(account_id) = registry.find_account(&addr_id) {
-                    if let Some(accounts) = accounts_map.as_mut() {
-                        if let Some(target_account) = accounts.get_mut(account_id) {
+                if let Some(account_id) = registry.find_account(&addr_id)
+                    && let Some(accounts) = accounts_map.as_mut()
+                        && let Some(target_account) = accounts.get_mut(account_id) {
                             // Add to the specified account
                             target_account.add_address(zewif_address.clone());
                             assigned = true;
                         }
-                    }
-                }
             }
         }
 

@@ -215,7 +215,7 @@ impl FromStr for AddressId {
 /// accounts. This is particularly important for wallets with multiple accounts or
 /// unified accounts with multiple address types.
 #[derive(Debug, Default)]
-pub(crate) struct AddressRegistry {
+pub struct AddressRegistry {
     // Maps from AddressId to account identifier (u256)
     address_to_account: std::collections::HashMap<AddressId, UfvkFingerprint>,
 }
@@ -229,17 +229,17 @@ impl AddressRegistry {
     }
 
     /// Register an address with an account
-    pub(crate) fn register(&mut self, address_id: AddressId, account_id: UfvkFingerprint) {
+    pub fn register(&mut self, address_id: AddressId, account_id: UfvkFingerprint) {
         self.address_to_account.insert(address_id, account_id);
     }
 
     /// Find the account ID for a given address
-    pub(crate) fn find_account(&self, address_id: &AddressId) -> Option<&UfvkFingerprint> {
+    pub fn find_account(&self, address_id: &AddressId) -> Option<&UfvkFingerprint> {
         self.address_to_account.get(address_id)
     }
 
     /// Find all addresses belonging to a specific account
-    pub(crate) fn find_addresses_for_account(
+    pub fn find_addresses_for_account(
         &self,
         account_id: &UfvkFingerprint,
     ) -> Vec<&AddressId> {
@@ -256,12 +256,12 @@ impl AddressRegistry {
     }
 
     /// Returns the number of registered addresses
-    pub(crate) fn address_count(&self) -> usize {
+    pub fn address_count(&self) -> usize {
         self.address_to_account.len()
     }
 
     /// Returns the number of unique accounts referenced
-    pub(crate) fn account_count(&self) -> usize {
+    pub fn account_count(&self) -> usize {
         self.address_to_account
             .values()
             .collect::<std::collections::HashSet<_>>()

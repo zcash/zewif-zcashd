@@ -151,7 +151,6 @@ impl ZcashdDump {
         self.records.contains_key(&key)
     }
 
-    #[allow(dead_code)]
     pub fn keys_by_keyname(&self) -> &HashMap<String, HashSet<DBKey>> {
         &self.keys_by_keyname
     }
@@ -218,7 +217,6 @@ impl ZcashdDump {
         output
     }
 
-    #[allow(dead_code)]
     pub fn dump_keys(&self) -> String {
         let mut output = String::new();
         for keyname in self.sorted_key_names() {
