@@ -16,7 +16,7 @@ byteorder = "1.5.0"
 uuid = "1.1"
 
 # The following dependencies are chosen to exactly match those for `zcashd
-# 0.6.2` and should not be updated unless `zcashd` updates its dependency
+# 0.6.20` and should not be updated unless `zcashd` updates its dependency
 # versions. This crate exists expressly for deserialization of `zcashd`
 # `wallet.dat` encoded data, so these must be kept in sync.
 zcash_address = "0.12"
