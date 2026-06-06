@@ -24,6 +24,7 @@ zcash_encoding = "0.2"
 zcash_keys = { version = "0.4", features = ["transparent-inputs", "sapling", "orchard"] }
 zcash_primitives = "0.19"
 zcash_protocol = "0.4"
+secp256k1 = "0.27"
 zip32 = "0.1"
 orchard = "0.10"
 sapling = { package = "sapling-crypto", version = "0.3", features = ["temporary-zcashd"] }
@@ -38,4 +39,4 @@ default = []
 with-context = []
 
 [patch.crates-io]
-zewif = { git = "https://github.com/nuttycom/zewif.git", rev = "8f005a6f5a189815dc08821f99cfe7e8af4e7f62" }
+zewif = { git = "https://github.com/zcash/zewif.git", rev = "798d7b3554ebada05bea63b67ee66f9c2558a21a" }

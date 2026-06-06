@@ -28,12 +28,12 @@ pub mod sprout;
 pub mod transparent;
 
 use std::collections::HashMap;
-use zewif::{Bip39Mnemonic, Network, TxId, sapling::SaplingIncomingViewingKey};
+use zewif::{Bip39Mnemonic, Network, Script, TxId, sapling::SaplingIncomingViewingKey};
 
 use orchard::OrchardNoteCommitmentTree;
 use sapling::{SaplingKeys, SaplingZPaymentAddress};
 use sprout::SproutKeys;
-use transparent::{KeyPoolEntry, Keys, PubKey, WalletKeys};
+use transparent::{KeyPoolEntry, Keys, PubKey, ScriptId, WalletKeys, WatchScript};
 
 #[derive(Debug)]
 pub struct ZcashdWallet {
@@ -42,6 +42,7 @@ pub struct ZcashdWallet {
     bestblock_nomerkle: Option<BlockLocator>,
     bestblock: BlockLocator,
     client_version: ClientVersion,
+    cscripts: HashMap<ScriptId, Script>,
     default_key: PubKey,
     key_pool: HashMap<i64, KeyPoolEntry>,
     keys: Keys,
@@ -52,6 +53,8 @@ pub struct ZcashdWallet {
     network_info: NetworkInfo,
     orchard_note_commitment_tree: OrchardNoteCommitmentTree,
     orderposnext: Option<i64>,
+    sapling_extended_full_viewing_keys:
+        HashMap<SaplingIncomingViewingKey, ::sapling::zip32::ExtendedFullViewingKey>,
     sapling_keys: SaplingKeys,
     sapling_z_addresses: HashMap<SaplingZPaymentAddress, SaplingIncomingViewingKey>,
     send_recipients: HashMap<TxId, Vec<RecipientMapping>>,
@@ -59,6 +62,7 @@ pub struct ZcashdWallet {
     wallet_keys: Option<WalletKeys>,
     transactions: HashMap<TxId, WalletTx>,
     unified_accounts: UnifiedAccounts,
+    watch_scripts: Vec<WatchScript>,
     witnesscachesize: i64,
 }
 
@@ -70,6 +74,7 @@ impl ZcashdWallet {
         bestblock_nomerkle: Option<BlockLocator>,
         bestblock: BlockLocator,
         client_version: ClientVersion,
+        cscripts: HashMap<ScriptId, Script>,
         default_key: PubKey,
         key_pool: HashMap<i64, KeyPoolEntry>,
         keys: Keys,
@@ -80,6 +85,10 @@ impl ZcashdWallet {
         network_info: NetworkInfo,
         orchard_note_commitment_tree: OrchardNoteCommitmentTree,
         orderposnext: Option<i64>,
+        sapling_extended_full_viewing_keys: HashMap<
+            SaplingIncomingViewingKey,
+            ::sapling::zip32::ExtendedFullViewingKey,
+        >,
         sapling_keys: SaplingKeys,
         sapling_z_addresses: HashMap<SaplingZPaymentAddress, SaplingIncomingViewingKey>,
         send_recipients: HashMap<TxId, Vec<RecipientMapping>>,
@@ -87,6 +96,7 @@ impl ZcashdWallet {
         wallet_keys: Option<WalletKeys>,
         transactions: HashMap<TxId, WalletTx>,
         unified_accounts: UnifiedAccounts,
+        watch_scripts: Vec<WatchScript>,
         witnesscachesize: i64,
     ) -> Self {
         ZcashdWallet {
@@ -95,6 +105,7 @@ impl ZcashdWallet {
             bestblock_nomerkle,
             bestblock,
             client_version,
+            cscripts,
             default_key,
             key_pool,
             keys,
@@ -105,6 +116,7 @@ impl ZcashdWallet {
             network_info,
             orchard_note_commitment_tree,
             orderposnext,
+            sapling_extended_full_viewing_keys,
             sapling_keys,
             sapling_z_addresses,
             send_recipients,
@@ -112,6 +124,7 @@ impl ZcashdWallet {
             wallet_keys,
             transactions,
             unified_accounts,
+            watch_scripts,
             witnesscachesize,
         }
     }
@@ -133,6 +146,13 @@ impl ZcashdWallet {
 
     pub fn client_version(&self) -> &ClientVersion {
         &self.client_version
+    }
+
+    /// Redeem scripts imported via the `importaddress` RPC and stored under the
+    /// `cscript` BDB key, keyed by their 20-byte `CScriptID` (RIPEMD-160 of
+    /// SHA-256 of the script).
+    pub fn cscripts(&self) -> &HashMap<ScriptId, Script> {
+        &self.cscripts
     }
 
     pub fn default_key(&self) -> &PubKey {
@@ -175,6 +195,17 @@ impl ZcashdWallet {
         self.orderposnext
     }
 
+    /// Sapling Extended Full Viewing Keys imported via the
+    /// `z_importviewingkey` RPC and stored under the `sapextfvk` BDB key,
+    /// keyed by the Incoming Viewing Key derived from each EFVK. Entries here
+    /// represent view-only Sapling keys: the wallet can detect transactions
+    /// against the corresponding addresses but cannot spend from them.
+    pub fn sapling_extended_full_viewing_keys(
+        &self,
+    ) -> &HashMap<SaplingIncomingViewingKey, ::sapling::zip32::ExtendedFullViewingKey> {
+        &self.sapling_extended_full_viewing_keys
+    }
+
     pub fn sapling_keys(&self) -> &SaplingKeys {
         &self.sapling_keys
     }
@@ -203,6 +234,14 @@ impl ZcashdWallet {
 
     pub fn unified_accounts(&self) -> &UnifiedAccounts {
         &self.unified_accounts
+    }
+
+    /// Watch-only output scripts imported via the `importaddress` or
+    /// `importpubkey` RPCs and stored under the `watchs` BDB key. Each entry
+    /// carries the raw script alongside a classification of the standard
+    /// transparent patterns (P2PK / P2PKH / P2SH).
+    pub fn watch_scripts(&self) -> &[WatchScript] {
+        &self.watch_scripts
     }
 
     pub fn witnesscachesize(&self) -> i64 {

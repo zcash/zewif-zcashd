@@ -21,9 +21,7 @@ fn main() {
         }
         "windows" => {
             println!("cargo:warning=Berkeley DB vendoring is not supported on Windows");
-            println!(
-                "cargo:warning=Please ensure db_dump.exe is available in your PATH"
-            );
+            println!("cargo:warning=Please ensure db_dump.exe is available in your PATH");
         }
         other => {
             println!(
@@ -38,8 +36,7 @@ fn main() {
 fn build_berkeley_db() -> Result<(), String> {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR")
         .map_err(|e| format!("Failed to get CARGO_MANIFEST_DIR: {}", e))?;
-    let out_dir =
-        env::var("OUT_DIR").map_err(|e| format!("Failed to get OUT_DIR: {}", e))?;
+    let out_dir = env::var("OUT_DIR").map_err(|e| format!("Failed to get OUT_DIR: {}", e))?;
 
     let tarball_path = Path::new(&manifest_dir).join(BDB_TARBALL);
     let out_path = Path::new(&out_dir);
@@ -49,10 +46,7 @@ fn build_berkeley_db() -> Result<(), String> {
 
     // Skip if already built
     if db_dump_binary.exists() {
-        println!(
-            "cargo:rustc-env=DB_DUMP_PATH={}",
-            db_dump_binary.display()
-        );
+        println!("cargo:rustc-env=DB_DUMP_PATH={}", db_dump_binary.display());
         return Ok(());
     }
 
@@ -127,10 +121,7 @@ fn build_berkeley_db() -> Result<(), String> {
     fs::copy(&built_binary, &db_dump_binary)
         .map_err(|e| format!("Failed to copy db_dump to OUT_DIR: {}", e))?;
 
-    println!(
-        "cargo:rustc-env=DB_DUMP_PATH={}",
-        db_dump_binary.display()
-    );
+    println!("cargo:rustc-env=DB_DUMP_PATH={}", db_dump_binary.display());
 
     Ok(())
 }
