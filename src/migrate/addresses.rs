@@ -1,9 +1,8 @@
 use anyhow::{Context, Result, anyhow};
 use secp256k1::PublicKey;
 use std::collections::{HashMap, HashSet};
-use zcash_keys::keys::UnifiedAddressRequest;
-#[allow(deprecated)]
-use zcash_primitives::legacy::{TransparentAddress, keys::pubkey_to_address};
+use zcash_keys::keys::{ReceiverRequirement, UnifiedAddressRequest};
+use zcash_transparent::address::TransparentAddress;
 use zip32::DiversifierIndex;
 
 use zcash_address::{ToAddress, ZcashAddress};
@@ -45,9 +44,8 @@ pub fn convert_transparent_addresses(
     for keypair in wallet.keys().keypairs() {
         let pk = PublicKey::from_slice(keypair.pubkey().as_slice())
             .context("parsing transparent public key from keypair")?;
-        #[allow(deprecated)]
-        let TransparentAddress::PublicKeyHash(hash) = pubkey_to_address(&pk) else {
-            unreachable!("pubkey_to_address always returns PublicKeyHash");
+        let TransparentAddress::PublicKeyHash(hash) = TransparentAddress::from_pubkey(&pk) else {
+            unreachable!("from_pubkey always returns PublicKeyHash");
         };
         let addr_str =
             ZcashAddress::from_transparent_p2pkh(address_network_from_zewif(network), hash)
@@ -480,14 +478,21 @@ pub fn convert_unified_addresses(
 
         let ua_str = {
             let j = DiversifierIndex::from(<[u8; 11]>::from(metadata.diversifier_index.clone()));
-            let request = UnifiedAddressRequest::new(
-                metadata.receiver_types.contains(&ReceiverType::P2PKH),
-                metadata.receiver_types.contains(&ReceiverType::Sapling),
-                metadata.receiver_types.contains(&ReceiverType::Orchard),
+            let require = |present: bool| {
+                if present {
+                    ReceiverRequirement::Require
+                } else {
+                    ReceiverRequirement::Omit
+                }
+            };
+            let request = UnifiedAddressRequest::custom(
+                require(metadata.receiver_types.contains(&ReceiverType::P2PKH)),
+                require(metadata.receiver_types.contains(&ReceiverType::Sapling)),
+                require(metadata.receiver_types.contains(&ReceiverType::Orchard)),
             )
-            .ok_or(anyhow!(
-                "Receiver types do not produce a valid Unified address."
-            ))?;
+            .map_err(|e| {
+                anyhow!("Receiver types do not produce a valid Unified address: {e}")
+            })?;
 
             ufvk.address(j, request)?
                 .encode(&wallet.network_info().to_address_encoding_network())

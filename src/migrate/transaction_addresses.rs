@@ -77,12 +77,12 @@ pub fn extract_transaction_addresses(
     if let Some(t_bundle) = tx.transaction().transparent_bundle() {
         for tx_in in t_bundle.vin.iter() {
             // Track the previous transaction
-            let txid_str = format!("{}", tx_in.prevout.txid());
-            let input_addr = format!("input:{}:{}", txid_str, tx_in.prevout.n());
+            let txid_str = format!("{}", tx_in.prevout().txid());
+            let input_addr = format!("input:{}:{}", txid_str, tx_in.prevout().n());
             addresses.insert(input_addr);
 
             // Extract potential P2PKH or P2SH addresses from script signatures
-            let script_data = tx_in.script_sig.0.clone();
+            let script_data = tx_in.script_sig().0.0.clone();
 
             // For P2PKH signatures, extract the pubkey
             if script_data.len() > 33 {
@@ -132,7 +132,7 @@ pub fn extract_transaction_addresses(
 
         // For transparent outputs, extract addresses
         for (vout_idx, tx_out) in t_bundle.vout.iter().enumerate() {
-            let script_data = tx_out.script_pubkey.0.clone();
+            let script_data = tx_out.script_pubkey().0.0.clone();
             let mut output_address = String::new();
 
             // P2PKH detection

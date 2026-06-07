@@ -2,9 +2,8 @@ use anyhow::{Context, Result};
 use secp256k1::PublicKey;
 use std::collections::{HashMap, HashSet};
 use zcash_address::{ToAddress, ZcashAddress};
-use zcash_primitives::consensus::NetworkType;
-#[allow(deprecated)]
-use zcash_primitives::legacy::{TransparentAddress, keys::pubkey_to_address};
+use zcash_protocol::consensus::NetworkType;
+use zcash_transparent::address::TransparentAddress;
 use zewif::{Account, ProtocolAddress, TxId, sapling::SaplingExtendedSpendingKey};
 
 use super::{
@@ -551,9 +550,8 @@ pub fn initialize_address_registry(
         };
         let pk = PublicKey::from_slice(keypair.pubkey().as_slice())
             .context("parsing transparent public key from keypair")?;
-        #[allow(deprecated)]
-        let TransparentAddress::PublicKeyHash(hash) = pubkey_to_address(&pk) else {
-            unreachable!("pubkey_to_address always returns PublicKeyHash");
+        let TransparentAddress::PublicKeyHash(hash) = TransparentAddress::from_pubkey(&pk) else {
+            unreachable!("from_pubkey always returns PublicKeyHash");
         };
         let addr_str =
             ZcashAddress::from_transparent_p2pkh(address_network_from_zewif(network), hash)

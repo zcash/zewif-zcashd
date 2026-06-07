@@ -1,17 +1,18 @@
+use zcash_protocol::consensus::NetworkType;
 use zewif::Network;
 
-pub(crate) fn convert_network(network: zcash_primitives::consensus::NetworkType) -> Network {
+pub(crate) fn convert_network(network: NetworkType) -> Network {
     match network {
-        zcash_address::Network::Main => Network::Main,
-        zcash_address::Network::Test => Network::Test,
-        zcash_address::Network::Regtest => Network::Regtest,
+        NetworkType::Main => Network::Main,
+        NetworkType::Test => Network::Test,
+        NetworkType::Regtest => Network::Regtest,
     }
 }
 
-pub(crate) fn address_network_from_zewif(network: Network) -> zcash_address::Network {
+pub(crate) fn address_network_from_zewif(network: Network) -> NetworkType {
     match network {
-        Network::Main => zcash_address::Network::Main,
-        Network::Test => zcash_address::Network::Test,
-        Network::Regtest => zcash_address::Network::Regtest,
+        Network::Main => NetworkType::Main,
+        Network::Test => NetworkType::Test,
+        Network::Regtest => NetworkType::Regtest,
     }
 }
