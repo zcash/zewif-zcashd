@@ -43,7 +43,6 @@
 /// # struct SomeType;
 /// # impl ParseWithParam<u32> for SomeType {
 /// #     fn parse(_parser: &mut Parser, _param: u32) -> Result<Self> { Ok(SomeType) }
-/// #     fn parse_buf(_buf: &dyn AsRef<[u8]>, _param: u32, _trace: bool) -> Result<Self> { Ok(SomeType) }
 /// # }
 /// #
 /// # fn example(parser: &mut Parser, param: u32) -> Result<()> {

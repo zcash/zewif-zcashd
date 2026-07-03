@@ -19,7 +19,7 @@ jobs:
         run: git diff --exit-code
 
   msrv:
-    name: MSRV check (1.85)
+    name: MSRV check (1.88)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,9 +27,9 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.85"
+          toolchain: "1.88"
       - name: Build with MSRV toolchain
-        run: cargo +1.85 build --workspace --all-features --all-targets
+        run: cargo +1.88 build --workspace --all-features --all-targets
 
   bitrot:
     name: Bitrot check
