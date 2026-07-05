@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 
 use zewif::{
-    Data, SecretStore, SeedEntry, SeedFingerprint, SeedMaterial, SproutKeyEntry,
+    SecretStore, SeedEntry, SeedFingerprint, SeedMaterial, SproutKeyEntry,
     TransparentKeyEntry, sapling::SaplingExtendedSpendingKey, sprout::SproutSpendingKey,
     transparent::TransparentSpendingKey,
 };
@@ -24,7 +24,7 @@ pub(crate) fn legacy_seed_fingerprint(wallet: &ZcashdWallet) -> Result<Option<Se
     let Some(seed) = wallet.legacy_hd_seed() else {
         return Ok(None);
     };
-    let fp = zip32::fingerprint::SeedFingerprint::from_seed(seed.seed_data().as_ref())
+    let fp = zip32::fingerprint::SeedFingerprint::from_seed(seed.as_slice())
         .ok_or_else(|| anyhow!("Legacy HD seed has an invalid length for ZIP-32 fingerprinting"))?;
     Ok(Some(SeedFingerprint::new(fp.to_bytes())))
 }
@@ -57,26 +57,16 @@ pub(crate) fn build_secret_store(wallet: &ZcashdWallet) -> Result<Option<SecretS
     // records and the encrypted-comment `wkey` records both carry spendable
     // secp256k1 keys.
     for keypair in wallet.keys().keypairs() {
-        match keypair.privkey().secp256k1_scalar() {
-            Ok(scalar) => store.add_transparent_key(TransparentKeyEntry::new(
-                Data::from_bytes(keypair.pubkey().as_slice()),
-                TransparentSpendingKey::new(scalar),
-            )),
-            Err(e) => eprintln!(
-                "warning: skipping transparent key with undecodable private key: {e}"
-            ),
+        match transparent_key_entry(keypair.pubkey().as_slice(), keypair.privkey()) {
+            Ok(entry) => store.add_transparent_key(entry),
+            Err(e) => eprintln!("warning: skipping transparent key: {e}"),
         }
     }
     if let Some(wallet_keys) = wallet.wallet_keys() {
         for wkey in wallet_keys.keypairs() {
-            match wkey.privkey().secp256k1_scalar() {
-                Ok(scalar) => store.add_transparent_key(TransparentKeyEntry::new(
-                    Data::from_bytes(wkey.pubkey().as_slice()),
-                    TransparentSpendingKey::new(scalar),
-                )),
-                Err(e) => eprintln!(
-                    "warning: skipping wkey transparent key with undecodable private key: {e}"
-                ),
+            match transparent_key_entry(wkey.pubkey().as_slice(), wkey.privkey()) {
+                Ok(entry) => store.add_transparent_key(entry),
+                Err(e) => eprintln!("warning: skipping wkey transparent key: {e}"),
             }
         }
     }
@@ -86,8 +76,10 @@ pub(crate) fn build_secret_store(wallet: &ZcashdWallet) -> Result<Option<SecretS
     for sapling_key in wallet.sapling_keys().keypairs() {
         let extsk = sapling_key.extsk();
         let fvk_bytes = sapling_extfvk_bytes(extsk)?;
+        let fvk = zewif::sapling::SaplingExtendedFullViewingKey::from_vec(fvk_bytes)
+            .map_err(|_| anyhow!("Sapling extended FVK encoding must be 169 bytes"))?;
         store.add_sapling_key(zewif::SaplingKeyEntry::new(
-            Data::from_vec(fvk_bytes),
+            fvk,
             SaplingExtendedSpendingKey::new(extsk.to_bytes()),
         ));
     }
@@ -97,9 +89,19 @@ pub(crate) fn build_secret_store(wallet: &ZcashdWallet) -> Result<Option<SecretS
         for (address, sk) in sprout_keys.iter() {
             let address_str = sprout_address_string(address, wallet.network());
             let key_bytes: [u8; 32] = *AsRef::<[u8; 32]>::as_ref(&sk.key());
+            // The canonical Sprout spending key encoding is the 2-byte
+            // network version prefix followed by a_sk (zcashd
+            // base58Prefixes[ZCSPENDING_KEY]).
+            let prefix: [u8; 2] = match wallet.network() {
+                zewif::Network::Mainnet => [0xAB, 0x36],
+                _ => [0xAC, 0x08],
+            };
+            let mut encoded = [0u8; 34];
+            encoded[..2].copy_from_slice(&prefix);
+            encoded[2..].copy_from_slice(&key_bytes);
             store.add_sprout_key(SproutKeyEntry::new(
                 address_str,
-                SproutSpendingKey::new(Data::from_bytes(key_bytes)),
+                SproutSpendingKey::new(encoded),
             ));
         }
     }
@@ -121,4 +123,21 @@ fn sapling_extfvk_bytes(extsk: &::sapling::zip32::ExtendedSpendingKey) -> Result
     efvk.write(&mut bytes)
         .map_err(|e| anyhow!("Serializing Sapling extended full viewing key: {e}"))?;
     Ok(bytes)
+}
+
+/// Builds a transparent secret-store entry from a serialized public key and
+/// the corresponding private key record.
+fn transparent_key_entry(
+    pubkey: &[u8],
+    privkey: &crate::zcashd_wallet::transparent::PrivKey,
+) -> Result<TransparentKeyEntry> {
+    let pubkey = zewif::transparent::TransparentPubKey::from_bytes(pubkey.to_vec())
+        .map_err(|e| anyhow!("invalid public key: {e}"))?;
+    let scalar = privkey
+        .secp256k1_scalar()
+        .map_err(|e| anyhow!("undecodable private key: {e}"))?;
+    Ok(TransparentKeyEntry::new(
+        pubkey,
+        TransparentSpendingKey::new(scalar),
+    ))
 }

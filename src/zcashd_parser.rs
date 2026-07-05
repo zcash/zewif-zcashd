@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use hex::ToHex as _;
 use std::{
     cell::RefCell,
@@ -541,7 +541,9 @@ impl<'a> ZcashdParser<'a> {
             let _fingerprint = parse!(buf = &key.data, SeedFingerprint, "seed fingerprint")?;
             let seed_data = parse!(buf = &value, Data, "legacy seed data")?;
             self.mark_key_parsed(&key);
-            Some(LegacySeed::new(seed_data))
+            let seed = LegacySeed::from_vec(seed_data.into())
+                .map_err(|_| anyhow!("legacy HD seed must be exactly 32 bytes"))?;
+            Some(seed)
         } else {
             None
         })

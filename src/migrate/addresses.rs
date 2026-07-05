@@ -9,7 +9,7 @@ use zcash_transparent::address::TransparentAddress;
 use zip32::DiversifierIndex;
 
 use zewif::{
-    Address, Data, KeyScope, Network, ProtocolAddress, Script, UnifiedAddress,
+    Address, KeyScope, Network, ProtocolAddress, Script, UnifiedAddress,
     transparent::TransparentSpendAuthority,
 };
 
@@ -50,7 +50,7 @@ struct TransparentInfo {
     spend_authority: Option<TransparentSpendAuthority>,
     scope: Option<KeyScope>,
     redeem_script: Option<Script>,
-    pubkey: Option<Data>,
+    pubkey: Option<zewif::transparent::TransparentPubKey>,
 }
 
 fn attach_transparent_addresses(
@@ -83,9 +83,16 @@ fn attach_transparent_addresses(
                 Ok(pk) => {
                     let addr_str = p2pkh_address_string(&pk, network);
                     let entry = entries.entry(addr_str).or_default();
-                    entry
-                        .pubkey
-                        .get_or_insert(Data::from_bytes(pubkey.as_slice()));
+                    match zewif::transparent::TransparentPubKey::from_bytes(
+                        pubkey.as_slice().to_vec(),
+                    ) {
+                        Ok(pk) => {
+                            entry.pubkey.get_or_insert(pk);
+                        }
+                        Err(e) => eprintln!(
+                            "warning: watch-only P2PK public key dropped: {e}"
+                        ),
+                    }
                     entry.scope.get_or_insert(KeyScope::Foreign);
                 }
                 Err(_) => {
