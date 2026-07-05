@@ -23,7 +23,7 @@ impl OrchardRawAddress {
 }
 
 impl OrchardRawAddress {
-    pub fn to_string(&self, network: Network) -> String {
+    pub fn to_string(&self, network: &Network) -> String {
         // Concatenate diversifier (11 bytes) and pk_d (32 bytes) into a 43-byte array
         let mut bytes = [0u8; 43];
         bytes[..11].copy_from_slice(self.diversifier.as_slice());

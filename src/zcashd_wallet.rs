@@ -250,7 +250,7 @@ impl ZcashdWallet {
 }
 
 impl ZcashdWallet {
-    pub fn network(&self) -> Network {
+    pub fn network(&self) -> &Network {
         self.network_info.network()
     }
 }

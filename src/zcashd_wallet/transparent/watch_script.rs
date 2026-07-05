@@ -122,7 +122,7 @@ impl WatchScript {
 
     /// If this script corresponds to a standard transparent address pattern,
     /// returns the encoded `t-addr` string for the given network.
-    pub fn to_address_string(&self, network: Network) -> Option<String> {
+    pub fn to_address_string(&self, network: &Network) -> Option<String> {
         match &self.kind {
             WatchScriptKind::P2PKH(key_id) => Some(key_id.to_string(network)),
             WatchScriptKind::P2SH(script_id) => Some(script_id.to_string(network)),

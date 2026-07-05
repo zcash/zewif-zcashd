@@ -535,10 +535,13 @@ impl<'a> ZcashdParser<'a> {
                 .dump
                 .record_for_keyname("hdseed")
                 .context("Getting 'hdseed' record")?;
-            let fingerprint = parse!(buf = &key.data, SeedFingerprint, "seed fingerprint")?;
+            // The `hdseed` record is keyed by the seed's ZIP 32 fingerprint;
+            // it is recomputed from the seed bytes during migration, so the
+            // key is not retained here.
+            let _fingerprint = parse!(buf = &key.data, SeedFingerprint, "seed fingerprint")?;
             let seed_data = parse!(buf = &value, Data, "legacy seed data")?;
             self.mark_key_parsed(&key);
-            Some(LegacySeed::new(seed_data, Some(fingerprint)))
+            Some(LegacySeed::new(seed_data))
         } else {
             None
         })
@@ -549,9 +552,11 @@ impl<'a> ZcashdParser<'a> {
             .dump
             .record_for_keyname("mnemonicphrase")
             .context("Getting 'mnemonicphrase' record")?;
-        let fingerprint = parse!(buf = &key.data, SeedFingerprint, "seed fingerprint")?;
-        let mut bip39_mnemonic = parse!(buf = &value, Bip39Mnemonic, "mnemonic phrase")?;
-        bip39_mnemonic.set_fingerprint(fingerprint);
+        // The `mnemonicphrase` record is keyed by the seed's ZIP 32
+        // fingerprint; the same value is recorded in the mnemonic HD chain
+        // (`seed_fp`), which is the source used during migration.
+        let _fingerprint = parse!(buf = &key.data, SeedFingerprint, "seed fingerprint")?;
+        let bip39_mnemonic = parse!(buf = &value, Bip39Mnemonic, "mnemonic phrase")?;
         self.mark_key_parsed(&key);
         Ok(bip39_mnemonic)
     }
@@ -897,7 +902,7 @@ mod tests {
         let entry = &watch_scripts[0];
         assert_eq!(entry.script().as_ref(), script.as_slice());
         assert!(matches!(entry.kind(), WatchScriptKind::P2PKH(_)));
-        assert!(entry.to_address_string(Network::Main).is_some());
+        assert!(entry.to_address_string(&Network::Mainnet).is_some());
     }
 
     /// A `watchs` record whose payload is non-standard must round-trip
@@ -927,7 +932,7 @@ mod tests {
             }
             other => panic!("expected Other, got {:?}", other),
         }
-        assert!(entry.to_address_string(Network::Main).is_none());
+        assert!(entry.to_address_string(&Network::Mainnet).is_none());
     }
 
     /// When neither key is present in the dump, both parsers must return

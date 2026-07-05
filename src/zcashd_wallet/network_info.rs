@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
 use zewif::Network;
 
 use crate::{parse, parser::prelude::*};
@@ -14,17 +14,17 @@ impl NetworkInfo {
         &self.zcash
     }
 
-    pub fn network(&self) -> Network {
-        self.network
+    pub fn network(&self) -> &Network {
+        &self.network
     }
 
     pub fn to_address_encoding_network(&self) -> zcash_protocol::consensus::Network {
         use zcash_protocol::consensus::Network::*;
         match self.network {
-            Network::Main => MainNetwork,
-            Network::Test => TestNetwork,
+            Network::Mainnet => MainNetwork,
+            Network::Testnet => TestNetwork,
             // Regtest addresses are encoded as for the test network.
-            Network::Regtest => TestNetwork,
+            Network::Regtest(_) => TestNetwork,
         }
     }
 }
@@ -32,7 +32,14 @@ impl NetworkInfo {
 impl Parse for NetworkInfo {
     fn parse(p: &mut Parser) -> Result<Self> {
         let (zcash, identifier): (String, String) = parse!(p, "(zcash, identifier)")?;
-        let network = Network::try_from(identifier)?;
+        // zcashd records the network as one of the canonical identifier
+        // strings emitted by `KeyConstants::NetworkIDString`.
+        let network = match identifier.as_str() {
+            "main" => Network::Mainnet,
+            "test" => Network::Testnet,
+            "regtest" => Network::Regtest(Default::default()),
+            other => bail!("Unrecognized zcashd network identifier: {other:?}"),
+        };
         Ok(Self { zcash, network })
     }
 }

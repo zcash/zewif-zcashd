@@ -1,11 +1,9 @@
-//! Read a `zcashd` `wallet.dat` and print a summary.
+//! Read a `zcashd` `wallet.dat`, migrate it to ZeWIF, and write the document.
 //!
-//! Useful as a smoke test that real wallet files still parse after a patch:
-//! point it at an actual `wallet.dat` and confirm the read succeeds.
+//! Usage: cargo run --example read_wallet -- /path/to/wallet.dat [out.zewif]
 //!
-//! Usage: cargo run --example read_wallet -- /path/to/wallet.dat
-//!
-//! With no argument, defaults to `$HOME/.zcash/wallet.dat`.
+//! With no arguments, reads `$HOME/.zcash/wallet.dat` and writes `wallet.zewif`
+//! in the current directory.
 
 use std::path::PathBuf;
 
@@ -21,10 +19,15 @@ fn default_wallet_path() -> PathBuf {
 }
 
 fn main() -> Result<()> {
-    let path: PathBuf = std::env::args()
-        .nth(1)
+    let mut args = std::env::args().skip(1);
+    let path: PathBuf = args
+        .next()
         .map(PathBuf::from)
         .unwrap_or_else(default_wallet_path);
+    let out_path: PathBuf = args
+        .next()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("wallet.zewif"));
 
     println!("Reading wallet: {}", path.display());
 
@@ -38,7 +41,6 @@ fn main() -> Result<()> {
     println!("\n=== Wallet summary ===");
     println!("network:            {:?}", wallet.network());
     println!("client version:     {}", wallet.client_version());
-    println!("min version:        {}", wallet.min_version());
     println!("transactions:       {}", wallet.transactions().len());
     println!("transparent addrs:  {}", wallet.address_names().len());
     println!("sapling z-addrs:    {}", wallet.sapling_z_addresses().len());
@@ -53,21 +55,29 @@ fn main() -> Result<()> {
     );
     println!("unparsed records:   {}", unparsed.len());
 
-    // migrate_to_zewif still hits an internal todo!() on some branches;
-    // guard against it so wallet reading above is not lost.
+    // The caller supplies the export (chain-tip) height; zcashd's wallet.dat
+    // records only a block-hash locator, not a numeric height.
     let export_height = BlockHeight::from_u32(2_400_000);
+
     println!("\n=== ZeWIF migration ===");
-    let migrated = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        migrate_to_zewif(&wallet, export_height)
-    }));
-    match migrated {
-        Ok(Ok(zewif)) => {
-            println!("wallets:      {}", zewif.wallets().len());
-            println!("transactions: {}", zewif.transactions().len());
-        }
-        Ok(Err(e)) => println!("migration error: {e:#}"),
-        Err(_) => println!("migration not yet implemented in this crate"),
+    let zewif = migrate_to_zewif(&wallet, export_height).context("migration failed")?;
+    for w in zewif.wallets() {
+        println!("accounts:      {}", w.accounts().len());
+        println!("address book:  {}", w.address_book().len());
     }
+    println!("transactions:  {}", zewif.transactions().len());
+    println!(
+        "secret store:  {}",
+        if zewif.secrets().is_some() {
+            "present"
+        } else {
+            "absent (viewing-only)"
+        }
+    );
+
+    let bytes = zewif.to_bytes().context("serializing ZeWIF document")?;
+    std::fs::write(&out_path, &bytes).with_context(|| format!("writing {}", out_path.display()))?;
+    println!("\nWrote {} bytes to {}", bytes.len(), out_path.display());
 
     Ok(())
 }

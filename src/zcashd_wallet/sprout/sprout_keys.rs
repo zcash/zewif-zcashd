@@ -13,6 +13,12 @@ impl SproutKeys {
     pub fn keypairs(&self) -> impl Iterator<Item = &SproutSpendingKey> {
         self.0.values()
     }
+
+    /// Iterates over the `(payment address, spending key)` pairs, exposing the
+    /// address needed to key each Sprout secret by its address.
+    pub fn iter(&self) -> impl Iterator<Item = (&SproutPaymentAddress, &SproutSpendingKey)> {
+        self.0.iter()
+    }
 }
 
 impl std::fmt::Debug for SproutKeys {
