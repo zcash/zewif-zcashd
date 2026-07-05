@@ -262,9 +262,9 @@ fn attach_unified_addresses(
             }
         };
         let request = UnifiedAddressRequest::custom(
-            require(metadata.receiver_types.contains(&ReceiverType::P2PKH)),
-            require(metadata.receiver_types.contains(&ReceiverType::Sapling)),
             require(metadata.receiver_types.contains(&ReceiverType::Orchard)),
+            require(metadata.receiver_types.contains(&ReceiverType::Sapling)),
+            require(metadata.receiver_types.contains(&ReceiverType::P2PKH)),
         )
         .map_err(|e| anyhow!("Receiver types do not produce a valid Unified address: {e}"))?;
 
