@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use zewif::{Blob32, NoQuotesDebugOption};
+use zewif::NoQuotesDebugOption;
 
 use crate::{parse, parser::prelude::*, zcashd_wallet::SecondsSinceEpoch};
 
@@ -11,7 +11,7 @@ pub struct KeyMetadata {
     version: i32,
     create_time: Option<SecondsSinceEpoch>,
     hd_keypath: Option<String>,
-    seed_fp: Option<Blob32>,
+    seed_fp: Option<[u8; 32]>,
 }
 
 impl std::fmt::Debug for KeyMetadata {
@@ -20,7 +20,10 @@ impl std::fmt::Debug for KeyMetadata {
             .field("version", &self.version)
             .field("create_time", &NoQuotesDebugOption(&self.create_time))
             .field("hd_keypath", &NoQuotesDebugOption(&self.hd_keypath))
-            .field("seed_fp", &NoQuotesDebugOption(&self.seed_fp))
+            .field(
+                "seed_fp",
+                &NoQuotesDebugOption(&self.seed_fp.as_ref().map(hex::encode)),
+            )
             .finish()
     }
 }
@@ -38,7 +41,7 @@ impl KeyMetadata {
         self.hd_keypath.as_ref()
     }
 
-    pub fn seed_fp(&self) -> Option<&Blob32> {
+    pub fn seed_fp(&self) -> Option<&[u8; 32]> {
         self.seed_fp.as_ref()
     }
 }
@@ -54,7 +57,7 @@ impl Parse for KeyMetadata {
             Some(create_time)
         };
         let hd_keypath: Option<String>;
-        let seed_fp: Option<Blob32>;
+        let seed_fp: Option<[u8; 32]>;
         if version >= VERSION_WITH_HDDATA {
             hd_keypath = Some(parse!(p, "hd_keypath")?);
             seed_fp = Some(parse!(p, "seed_fp")?);
@@ -66,7 +69,7 @@ impl Parse for KeyMetadata {
             version,
             create_time,
             hd_keypath: hd_keypath.filter(|p| !p.trim().is_empty()),
-            seed_fp: seed_fp.filter(|fp| fp.as_bytes() != &[0u8; 32]),
+            seed_fp: seed_fp.filter(|fp| fp != &[0u8; 32]),
         })
     }
 }

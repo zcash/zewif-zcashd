@@ -1,13 +1,12 @@
 use anyhow::Result;
 
-use zewif::Blob32;
 
 use crate::{parse, parser::prelude::*, zcashd_wallet::SecondsSinceEpoch};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct MnemonicHDChain {
     version: i32,
-    seed_fp: Blob32,
+    seed_fp: [u8; 32],
     create_time: SecondsSinceEpoch,
     account_counter: u32,
     legacy_tkey_external_counter: u32,
@@ -16,12 +15,39 @@ pub struct MnemonicHDChain {
     mnemonic_seed_backup_confirmed: bool,
 }
 
+impl std::fmt::Debug for MnemonicHDChain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MnemonicHDChain")
+            .field("version", &self.version)
+            .field("seed_fp", &hex::encode(self.seed_fp))
+            .field("create_time", &self.create_time)
+            .field("account_counter", &self.account_counter)
+            .field(
+                "legacy_tkey_external_counter",
+                &self.legacy_tkey_external_counter,
+            )
+            .field(
+                "legacy_tkey_internal_counter",
+                &self.legacy_tkey_internal_counter,
+            )
+            .field(
+                "legacy_sapling_key_counter",
+                &self.legacy_sapling_key_counter,
+            )
+            .field(
+                "mnemonic_seed_backup_confirmed",
+                &self.mnemonic_seed_backup_confirmed,
+            )
+            .finish()
+    }
+}
+
 impl MnemonicHDChain {
     pub fn version(&self) -> i32 {
         self.version
     }
 
-    pub fn seed_fp(&self) -> &Blob32 {
+    pub fn seed_fp(&self) -> &[u8; 32] {
         &self.seed_fp
     }
 

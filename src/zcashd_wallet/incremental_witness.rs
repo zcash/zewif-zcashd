@@ -40,15 +40,14 @@ use crate::{parse, parser::prelude::*};
 ///
 /// # Examples
 /// ```
-/// # use zewif::Blob;
 /// # use zewif_zcashd::zcashd_wallet::{IncrementalMerkleTree, IncrementalWitness};
 /// // Create a tree with a specific structure
 /// let tree = IncrementalMerkleTree::new();
 ///
 /// // Create a witness for a note at a specific position
-/// let filled: Vec<Blob<32>> = Vec::new();
+/// let filled: Vec<[u8; 32]> = Vec::new();
 /// let cursor = None;
-/// let witness = IncrementalWitness::<32, Blob<32>>::with_fields(tree, filled, cursor);
+/// let witness = IncrementalWitness::<32, [u8; 32]>::with_fields(tree, filled, cursor);
 ///
 /// // In a real implementation, this witness would be updated as new notes are added to the tree
 /// ```

@@ -79,22 +79,26 @@ fn attach_transparent_addresses(
     // bare watched addresses; P2SH entries pair with a redeem script (below).
     for watch in wallet.watch_scripts() {
         match watch.kind() {
-            WatchScriptKind::P2PK(pubkey) => {
-                match PublicKey::from_slice(pubkey.as_slice()) {
-                    Ok(pk) => {
-                        let addr_str = p2pkh_address_string(&pk, network);
-                        let entry = entries.entry(addr_str).or_default();
-                        entry.pubkey.get_or_insert(Data::from_bytes(pubkey.as_slice()));
-                        entry.scope.get_or_insert(KeyScope::Foreign);
-                    }
-                    Err(_) => eprintln!(
-                        "warning: watch-only P2PK script with unparsable public key dropped",
-                    ),
+            WatchScriptKind::P2PK(pubkey) => match PublicKey::from_slice(pubkey.as_slice()) {
+                Ok(pk) => {
+                    let addr_str = p2pkh_address_string(&pk, network);
+                    let entry = entries.entry(addr_str).or_default();
+                    entry
+                        .pubkey
+                        .get_or_insert(Data::from_bytes(pubkey.as_slice()));
+                    entry.scope.get_or_insert(KeyScope::Foreign);
                 }
-            }
+                Err(_) => {
+                    eprintln!("warning: watch-only P2PK script with unparsable public key dropped",)
+                }
+            },
             WatchScriptKind::P2PKH(_) | WatchScriptKind::P2SH(_) => {
                 if let Some(addr_str) = watch.to_address_string(network) {
-                    entries.entry(addr_str).or_default().scope.get_or_insert(KeyScope::Foreign);
+                    entries
+                        .entry(addr_str)
+                        .or_default()
+                        .scope
+                        .get_or_insert(KeyScope::Foreign);
                 }
             }
             WatchScriptKind::Other(_) => eprintln!(
@@ -161,10 +165,7 @@ fn p2pkh_address_string(pk: &PublicKey, network: &Network) -> String {
     ZcashAddress::from_transparent_p2pkh(address_network_from_zewif(network), hash).to_string()
 }
 
-fn attach_sapling_addresses(
-    wallet: &ZcashdWallet,
-    accounts: &mut WalletAccounts,
-) -> Result<()> {
+fn attach_sapling_addresses(wallet: &ZcashdWallet, accounts: &mut WalletAccounts) -> Result<()> {
     let network = wallet.network();
     let legacy_index = accounts.legacy_index;
     let mut emitted: HashSet<zewif::sapling::SaplingIncomingViewingKey> = HashSet::new();
@@ -178,8 +179,10 @@ fn attach_sapling_addresses(
     // `sapzaddr` record.
     for (sapling_address, ivk) in wallet.sapling_z_addresses() {
         let addr_str = sapling_address.to_string(network);
-        let mut sapling_addr = zewif::sapling::Address::new(addr_str.clone());
-        sapling_addr.set_diversifier_index(sapling_address.diversifier().clone());
+        // Note: the parsed z-address exposes its raw diversifier, which is
+        // part of the address encoding itself, not the ZIP 32 diversifier
+        // index; legacy zcashd records no index, so none is set here.
+        let sapling_addr = zewif::sapling::Address::new(addr_str.clone());
         collected.push((addr_str, sapling_addr, KeyScope::External));
         emitted.insert(*ivk);
     }
@@ -253,7 +256,7 @@ fn attach_unified_addresses(
                 )
             })?;
 
-        let j = DiversifierIndex::from(<[u8; 11]>::from(metadata.diversifier_index.clone()));
+        let j = DiversifierIndex::from(metadata.diversifier_index);
         let require = |present: bool| {
             if present {
                 ReceiverRequirement::Require
@@ -271,10 +274,10 @@ fn attach_unified_addresses(
         let ua_str = ufvk.address(j, request)?.encode(params);
 
         let mut unified_address = UnifiedAddress::new(ua_str);
-        unified_address.set_diversifier_index(metadata.diversifier_index.clone());
+        unified_address
+            .set_diversifier_index(zewif::DiversifierIndex::new(metadata.diversifier_index));
 
-        let mut address =
-            Address::new(ProtocolAddress::Unified(Box::new(unified_address)));
+        let mut address = Address::new(ProtocolAddress::Unified(Box::new(unified_address)));
         address.set_scope(KeyScope::External);
 
         match accounts.ufvk_index.get(&metadata.key_id) {

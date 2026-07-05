@@ -1,5 +1,4 @@
 use anyhow::{Context, Error, Result, bail};
-use zewif::Blob20;
 
 use crate::{parse, parser::prelude::*};
 
@@ -42,21 +41,15 @@ pub const U160_SIZE: usize = 20;
 pub struct u160([u8; U160_SIZE]);
 
 impl u160 {
-    /// Creates a new `u160` value from a 20-byte `Blob20`.
-    ///
-    /// This method provides a convenient way to create a `u160` from a `Blob20`
-    /// without error checking, since `Blob20` already guarantees the correct size.
+    /// Creates a new `u160` value from a 20-byte array.
     ///
     /// # Examples
     /// ```
-    /// # use zewif::Blob20;
     /// # use zewif_zcashd::zcashd_wallet::{u160, U160_SIZE};
-    /// // Create a u160 from a Blob20
-    /// let blob = Blob20::new([0u8; U160_SIZE]);
-    /// let value = u160::from_blob(blob);
+    /// let value = u160::from_bytes([0u8; U160_SIZE]);
     /// ```
-    pub fn from_blob(blob: Blob20) -> Self {
-        Self(blob.into())
+    pub fn from_bytes(bytes: [u8; U160_SIZE]) -> Self {
+        Self(bytes)
     }
 
     /// Creates a new `u160` value from a byte slice.
@@ -84,8 +77,7 @@ impl u160 {
     /// # Errors
     /// Returns an error if the byte slice is not exactly 20 bytes long.
     pub fn from_slice(bytes: &[u8]) -> Result<Self> {
-        let blob = Blob20::from_slice(bytes).context("Creating U160 from slice")?;
-        Ok(Self(blob.into()))
+        Self::try_from(bytes).context("Creating U160 from slice")
     }
 }
 
@@ -148,7 +140,7 @@ impl std::fmt::Display for u160 {
 
 impl Parse for u160 {
     fn parse(p: &mut Parser) -> Result<Self> {
-        let blob = parse!(p, Blob20, "u160")?;
-        Ok(Self(blob.into()))
+        let bytes = parse!(p, [u8; 20], "u160")?;
+        Ok(Self(bytes))
     }
 }

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use zcash_address::{ToAddress, ZcashAddress, unified::Encoding};
-use zewif::{Blob, Blob32, Network};
+use zewif::Network;
 
 use crate::{parse, parser::prelude::*};
 
@@ -8,16 +8,16 @@ use crate::migrate::primitives::address_network_from_zewif;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OrchardRawAddress {
-    diversifier: Blob<11>,
-    pk_d: Blob32,
+    diversifier: [u8; 11],
+    pk_d: [u8; 32],
 }
 
 impl OrchardRawAddress {
-    pub fn diversifier(&self) -> &Blob<11> {
+    pub fn diversifier(&self) -> &[u8; 11] {
         &self.diversifier
     }
 
-    pub fn pk_d(&self) -> &Blob32 {
+    pub fn pk_d(&self) -> &[u8; 32] {
         &self.pk_d
     }
 }

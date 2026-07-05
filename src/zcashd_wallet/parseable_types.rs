@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::{Context, Result, anyhow, bail};
 use zcash_keys::keys::UnifiedFullViewingKey;
-use zewif::{Blob, Data, SeedFingerprint, sapling::SaplingIncomingViewingKey};
+use zewif::{Data, SeedFingerprint, sapling::SaplingIncomingViewingKey};
 
 use crate::{
     parse,
@@ -266,41 +266,6 @@ impl<T: Parse> Parse for Option<T> {
     }
 }
 
-/// Implementation of the `Parse` trait for fixed-size byte arrays.
-///
-/// This allows `Blob<N>` to be directly parsed from a binary stream using the
-/// `parse!` macro, which is particularly useful when reading ZCash structures
-/// like transaction IDs, keys, and other fixed-size fields.
-///
-/// # Examples
-/// ```no_run
-/// # use zewif::Blob;
-/// # use zewif_zcashd::parser::Parser;
-/// # use zewif_zcashd::parse;
-/// # use anyhow::Result;
-/// #
-/// # fn example(parser: &mut Parser) -> Result<()> {
-/// // Parse a 32-byte transaction hash from a binary stream
-/// let tx_hash = parse!(parser, Blob<32>, "transaction hash")?;
-///
-/// // The parse macro adds helpful context for error messages
-/// # Ok(())
-/// # }
-/// ```
-///
-/// # Errors
-/// Returns an error if the parser does not have N bytes remaining.
-impl<const N: usize> Parse for zewif::Blob<N> {
-    fn parse(parser: &mut Parser) -> Result<Self>
-    where
-        Self: Sized,
-    {
-        let data = parser
-            .next(N)
-            .with_context(|| format!("Parsing Blob<{}>", N))?;
-        Ok(Self::from_slice(data)?)
-    }
-}
 
 impl Parse for zewif::Data {
     /// Parses a variable-length `Data` instance from a binary parser.
@@ -450,8 +415,8 @@ impl Parse for UnifiedFullViewingKey {
 
 impl Parse for ::orchard::keys::IncomingViewingKey {
     fn parse(p: &mut Parser) -> Result<Self> {
-        let bytes: Blob<64> = parse!(p, "orchard IVK")?;
-        ::orchard::keys::IncomingViewingKey::from_bytes(bytes.as_bytes())
+        let bytes: [u8; 64] = parse!(p, "orchard IVK")?;
+        ::orchard::keys::IncomingViewingKey::from_bytes(&bytes)
             .into_option()
             .ok_or(anyhow::anyhow!("Not a valid Orchard incoming viewing key"))
     }

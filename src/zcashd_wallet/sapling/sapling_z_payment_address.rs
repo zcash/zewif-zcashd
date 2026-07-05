@@ -1,13 +1,13 @@
 use anyhow::Result;
 use zcash_address::{ToAddress, ZcashAddress};
-use zewif::{Blob, Network};
+use zewif::Network;
 
 use crate::{migrate::primitives::address_network_from_zewif, parse, parser::prelude::*};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SaplingZPaymentAddress {
-    diversifier: Blob<11>,
-    pk: Blob<32>,
+    diversifier: [u8; 11],
+    pk: [u8; 32],
 }
 
 impl SaplingZPaymentAddress {
@@ -20,11 +20,11 @@ impl SaplingZPaymentAddress {
         addr.to_string()
     }
 
-    pub fn diversifier(&self) -> &Blob<11> {
+    pub fn diversifier(&self) -> &[u8; 11] {
         &self.diversifier
     }
 
-    pub fn pk(&self) -> &Blob<32> {
+    pub fn pk(&self) -> &[u8; 32] {
         &self.pk
     }
 }

@@ -4,8 +4,8 @@ use anyhow::Result;
 use orchard::keys::{IncomingViewingKey as OrchardIvk, Scope};
 
 use zewif::{
-    Blob, CommitmentTreeData, ReceivedOutput, ReceivedOutputPool, SaplingOutputData,
-    OrchardOutputData, SproutOutputData, TreePosition, TxId,
+    CommitmentTreeData, OrchardOutputData, ReceivedOutput, ReceivedOutputPool, SaplingOutputData,
+    SproutOutputData, TreePosition, TxId,
 };
 
 use crate::{
@@ -53,7 +53,7 @@ pub(crate) fn attach_received_outputs(
             for (outpoint, nd) in note_data {
                 let tree_data = sapling_note_position(nd)
                     .map(|p| CommitmentTreeData::Position(TreePosition::new(p)));
-                let nullifier = nd.nullifier().cloned();
+                let nullifier = nd.nullifier().map(|n| zewif::Nullifier::new(*n));
                 let output = ReceivedOutput::new(
                     outpoint.vout(),
                     ReceivedOutputPool::Sapling(SaplingOutputData::new(tree_data, nullifier)),
@@ -90,9 +90,7 @@ pub(crate) fn attach_received_outputs(
 
         // Sprout notes -> legacy account.
         for (outpoint, nd) in wtx.map_sprout_note_data() {
-            let nullifier = nd
-                .nullifer()
-                .map(|n| Blob::<32>::new(n.into_bytes()));
+            let nullifier = nd.nullifer().map(|n| zewif::Nullifier::new(n.into_bytes()));
             let output_index = 2 * outpoint.js() as u32 + outpoint.n() as u32;
             let sprout_txid = TxId::from_bytes(outpoint.hash().into_bytes());
             let output = ReceivedOutput::new(
@@ -194,7 +192,7 @@ fn merkle_tree_size(tree: &IncrementalMerkleTree) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::merkle_tree_size;
-    use crate::zcashd_wallet::{u256, IncrementalMerkleTree};
+    use crate::zcashd_wallet::{IncrementalMerkleTree, u256};
 
     fn node() -> u256 {
         u256::try_from(&[1u8; 32]).unwrap()

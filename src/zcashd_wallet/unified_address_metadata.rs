@@ -1,6 +1,5 @@
 use anyhow::Result;
 use std::collections::HashSet;
-use zewif::Blob;
 
 use crate::{
     parse,
@@ -11,7 +10,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnifiedAddressMetadata {
     pub key_id: UfvkFingerprint,
-    pub diversifier_index: Blob<11>,
+    pub diversifier_index: [u8; 11],
     pub receiver_types: HashSet<ReceiverType>,
 }
 

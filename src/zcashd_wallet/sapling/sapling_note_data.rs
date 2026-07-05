@@ -1,14 +1,14 @@
 use anyhow::Result;
-use zewif::{Blob, sapling::SaplingIncomingViewingKey};
+use zewif::sapling::SaplingIncomingViewingKey;
 use crate::{parse, parser::prelude::*, zcashd_wallet::IncrementalWitness};
 
-pub type SaplingWitness = IncrementalWitness<32, Blob<32>>;
+pub type SaplingWitness = IncrementalWitness<32, [u8; 32]>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SaplingNoteData {
     version: i32,
     incoming_viewing_key: SaplingIncomingViewingKey,
-    nullifier: Option<Blob<32>>,
+    nullifier: Option<[u8; 32]>,
     witnesses: Vec<SaplingWitness>,
     witness_height: i32,
 }
@@ -22,7 +22,7 @@ impl SaplingNoteData {
         &self.incoming_viewing_key
     }
 
-    pub fn nullifier(&self) -> Option<&Blob<32>> {
+    pub fn nullifier(&self) -> Option<&[u8; 32]> {
         self.nullifier.as_ref()
     }
 

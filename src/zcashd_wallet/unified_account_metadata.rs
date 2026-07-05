@@ -18,8 +18,12 @@ impl UfvkFingerprint {
         Ok(Self(id_bytes))
     }
 
+    /// Returns the fingerprint as hex in zcashd's display order (byte-reversed,
+    /// matching `uint256::GetHex`), for cross-referencing against zcashd output.
     pub fn to_hex(&self) -> String {
-        hex::encode(self.0)
+        let mut bytes = self.0;
+        bytes.reverse();
+        hex::encode(bytes)
     }
 }
 
