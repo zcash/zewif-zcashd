@@ -110,13 +110,27 @@ pub(crate) fn attach_received_outputs(
 
     for (account_index, txns) in by_account {
         for (txid, mut outputs) in txns {
-            // Deterministic ordering within a transaction.
-            outputs.sort_by_key(|o| o.output_index());
+            // Deterministic ordering within a transaction: by pool, then by
+            // output index (the source note maps have no stable iteration
+            // order, and different pools can share an output index).
+            outputs.sort_by_key(|o| (pool_rank(o), o.output_index()));
             accounts.accounts[account_index].add_relevant_transaction(txid, outputs);
         }
     }
 
     Ok(())
+}
+
+/// A stable ordering rank for a received output's pool, so that outputs from
+/// different pools sharing an output index have a deterministic order.
+fn pool_rank(output: &ReceivedOutput) -> u8 {
+    match output.pool() {
+        ReceivedOutputPool::Transparent(_) => 0,
+        ReceivedOutputPool::Sprout(_) => 1,
+        ReceivedOutputPool::Sapling(_) => 2,
+        ReceivedOutputPool::Orchard(_) => 3,
+        _ => 255,
+    }
 }
 
 /// The external and internal Orchard incoming viewing keys of each unified

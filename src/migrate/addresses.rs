@@ -169,16 +169,18 @@ fn attach_sapling_addresses(
     let legacy_index = accounts.legacy_index;
     let mut emitted: HashSet<zewif::sapling::SaplingIncomingViewingKey> = HashSet::new();
 
+    // Collect (address string, protocol address, scope) and emit sorted by
+    // address, so the migrated wallet is reproducible across runs (the source
+    // maps have no stable iteration order).
+    let mut collected: Vec<(String, zewif::sapling::Address, KeyScope)> = Vec::new();
+
     // Spend-capable and view-only-with-default-address Sapling addresses have a
     // `sapzaddr` record.
     for (sapling_address, ivk) in wallet.sapling_z_addresses() {
         let addr_str = sapling_address.to_string(network);
-        let mut sapling_addr = zewif::sapling::Address::new(addr_str);
+        let mut sapling_addr = zewif::sapling::Address::new(addr_str.clone());
         sapling_addr.set_diversifier_index(sapling_address.diversifier().clone());
-        let mut address =
-            Address::new(ProtocolAddress::Sapling(Box::new(sapling_addr)));
-        address.set_scope(KeyScope::External);
-        accounts.accounts[legacy_index].add_address(address);
+        collected.push((addr_str, sapling_addr, KeyScope::External));
         emitted.insert(*ivk);
     }
 
@@ -194,12 +196,18 @@ fn attach_sapling_addresses(
             payment_address.to_bytes(),
         )
         .to_string();
-        let mut address =
-            Address::new(ProtocolAddress::Sapling(Box::new(zewif::sapling::Address::new(
-                addr_str,
-            ))));
         // Imported view-only key material not derived from account keys.
-        address.set_scope(KeyScope::Foreign);
+        collected.push((
+            addr_str.clone(),
+            zewif::sapling::Address::new(addr_str),
+            KeyScope::Foreign,
+        ));
+    }
+
+    collected.sort_by(|(a, _, _), (b, _, _)| a.cmp(b));
+    for (_, sapling_addr, scope) in collected {
+        let mut address = Address::new(ProtocolAddress::Sapling(Box::new(sapling_addr)));
+        address.set_scope(scope);
         accounts.accounts[legacy_index].add_address(address);
     }
 
@@ -212,10 +220,16 @@ fn attach_sprout_addresses(wallet: &ZcashdWallet, accounts: &mut WalletAccounts)
     };
     let network = wallet.network();
     let legacy_index = accounts.legacy_index;
-    for (sprout_address, _sk) in sprout_keys.iter() {
-        let addr_str = sprout_address_string(sprout_address, network);
-        let mut address =
-            Address::new(ProtocolAddress::Sprout(zewif::sprout::SproutAddress::new(addr_str)));
+
+    let mut addrs: Vec<String> = sprout_keys
+        .iter()
+        .map(|(sprout_address, _sk)| sprout_address_string(sprout_address, network))
+        .collect();
+    addrs.sort();
+    for addr_str in addrs {
+        let mut address = Address::new(ProtocolAddress::Sprout(zewif::sprout::SproutAddress::new(
+            addr_str,
+        )));
         address.set_scope(KeyScope::External);
         accounts.accounts[legacy_index].add_address(address);
     }
