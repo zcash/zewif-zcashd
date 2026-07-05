@@ -1899,7 +1899,7 @@ dependencies = [
 [[package]]
 name = "zewif"
 version = "0.1.0"
-source = "git+https://github.com/zcash/zewif.git?branch=feature%2Fcbor-serialization#3f86d68f0461cc6f3eed7600188dfca6936242aa"
+source = "git+https://github.com/zcash/zewif.git?branch=feature%2Fcbor-serialization#118cea76ab1236ea7aa1776bb841209e6e85a58b"
 dependencies = [
  "hex",
  "minicbor",
