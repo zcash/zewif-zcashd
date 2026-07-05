@@ -56,7 +56,7 @@ fn convert_transaction(
         tx.set_block_position(TxBlockPosition::new(block_hash, wtx.index() as u32));
     }
 
-    if let Some(height) = tx_heights.get(txid.as_ref()) {
+    if let Some(height) = tx_heights.get(txid.as_bytes()) {
         tx.set_mined_height(BlockHeight::from_u32(*height));
     }
 

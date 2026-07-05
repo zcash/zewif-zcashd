@@ -69,7 +69,7 @@ pub(crate) fn attach_received_outputs(
 
         // Orchard actions -> matching unified account (else legacy).
         if let Some(meta) = wtx.orchard_tx_meta() {
-            let tx_positions = orchard_positions.get(txid.as_ref());
+            let tx_positions = orchard_positions.get(txid.as_bytes());
             for (action_index, ivk) in meta.receiving_keys() {
                 let account_index = route_orchard(&orchard_routes, ivk).unwrap_or(legacy_index);
                 let tree_data = tx_positions

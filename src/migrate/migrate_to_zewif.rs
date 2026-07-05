@@ -76,7 +76,7 @@ fn set_account_birthdays(wallet: &ZcashdWallet, accounts: &mut WalletAccounts) {
         let birthday = account
             .relevant_transactions()
             .keys()
-            .filter_map(|txid| tx_heights.get(txid.as_ref()).copied())
+            .filter_map(|txid| tx_heights.get(txid.as_bytes()).copied())
             .min();
         if let Some(height) = birthday {
             account.set_birthday_height(BlockHeight::from_u32(height));
