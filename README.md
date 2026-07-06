@@ -32,7 +32,8 @@ metadata, etc.). Migrating that data
 faithfully requires:
 
 1. **Reading the BDB file.** Done by shelling out to `db_dump` to produce a
-   key/value listing. A copy of Berkeley DB 6.2.32 is vendored in `vendor/`
+   key/value listing. A copy of Berkeley DB 6.2.23 (matching the version used
+   by `zcashd`) is vendored in `vendor/`
    and built by `build.rs`, so the crate is self-contained and does not
    require a system-installed BDB. A user-supplied `db_dump` binary can also
    be passed explicitly via `BDBDump::from_file_with_path`.
@@ -60,7 +61,7 @@ With no argument it defaults to `$HOME/.zcash/wallet.dat`.
 ## Layout
 
 - `src/bdb_dump.rs` — invokes `db_dump` and collects its key/value output.
-- `build.rs` + `vendor/db-6.2.32.tar.gz` — vendors and builds Berkeley DB so
+- `build.rs` + `vendor/db-6.2.23.tar.gz` — vendors and builds Berkeley DB so
   `db_dump` is available at compile time.
 - `src/zcashd_dump.rs`, `src/zcashd_parser.rs`, `src/zcashd_wallet/`,
   `src/parser/` — decode the BDB records into typed `zcashd` wallet structs.
