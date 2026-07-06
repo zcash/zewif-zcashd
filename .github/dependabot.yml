@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      # These zcash dependencies are pinned to match zcashd 0.6.2 and should
+      # not be updated unless zcashd updates its dependency versions.
+      - dependency-name: zcash_address
+      - dependency-name: zcash_encoding
+      - dependency-name: zcash_keys
+      - dependency-name: zcash_primitives
+      - dependency-name: zcash_protocol
+      - dependency-name: zip32
+      - dependency-name: orchard
+      - dependency-name: sapling-crypto
+      - dependency-name: incrementalmerkletree
+      - dependency-name: bridgetree
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
