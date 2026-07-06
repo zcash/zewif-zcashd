@@ -79,7 +79,7 @@ pub(crate) fn build_accounts(
             )));
         account.set_name(format!("Account #{}", meta.zip32_account_id()));
         account.set_key_source(KeySource::Derived(DerivedKeySource::new(
-            *meta.seed_fingerprint(),
+            meta.seed_fingerprint().clone(),
             meta.zip32_account_id(),
             None,
         )));

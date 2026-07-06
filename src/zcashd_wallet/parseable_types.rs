@@ -379,8 +379,8 @@ impl Parse for zewif::TxId {
 
 impl Parse for SeedFingerprint {
     fn parse(p: &mut Parser) -> Result<Self> {
-        let bytes = parse!(p, "seed_fingerprint")?;
-        Ok(Self::new(bytes))
+        let bytes: [u8; 32] = parse!(p, "seed_fingerprint")?;
+        Ok(crate::zcashd_wallet::encode_seed_fingerprint(&bytes))
     }
 }
 

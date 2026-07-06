@@ -1,7 +1,11 @@
 use anyhow::Result;
 
 
-use crate::{parse, parser::prelude::*, zcashd_wallet::SecondsSinceEpoch};
+use crate::{
+    parse,
+    parser::prelude::*,
+    zcashd_wallet::{SecondsSinceEpoch, encode_seed_fingerprint},
+};
 
 #[derive(Clone, PartialEq)]
 pub struct MnemonicHDChain {
@@ -19,7 +23,7 @@ impl std::fmt::Debug for MnemonicHDChain {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MnemonicHDChain")
             .field("version", &self.version)
-            .field("seed_fp", &hex::encode(self.seed_fp))
+            .field("seed_fp", &encode_seed_fingerprint(&self.seed_fp))
             .field("create_time", &self.create_time)
             .field("account_counter", &self.account_counter)
             .field(

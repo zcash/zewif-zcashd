@@ -2,7 +2,11 @@ use anyhow::Result;
 
 use zewif::NoQuotesDebugOption;
 
-use crate::{parse, parser::prelude::*, zcashd_wallet::SecondsSinceEpoch};
+use crate::{
+    parse,
+    parser::prelude::*,
+    zcashd_wallet::{SecondsSinceEpoch, encode_seed_fingerprint},
+};
 
 const VERSION_WITH_HDDATA: i32 = 10;
 
@@ -22,7 +26,7 @@ impl std::fmt::Debug for KeyMetadata {
             .field("hd_keypath", &NoQuotesDebugOption(&self.hd_keypath))
             .field(
                 "seed_fp",
-                &NoQuotesDebugOption(&self.seed_fp.as_ref().map(hex::encode)),
+                &NoQuotesDebugOption(&self.seed_fp.as_ref().map(encode_seed_fingerprint)),
             )
             .finish()
     }

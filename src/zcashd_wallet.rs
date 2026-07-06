@@ -22,6 +22,15 @@ mod_use!(u252_type);
 mod_use!(u256_type);
 mod_use!(wallet_tx);
 
+/// Encodes raw ZIP 32 seed fingerprint bytes in their canonical string
+/// form: Bech32m with the Human-Readable Part "zip32seedfp".
+pub fn encode_seed_fingerprint(bytes: &[u8; 32]) -> zewif::SeedFingerprint {
+    let hrp = bech32::Hrp::parse("zip32seedfp").expect("static HRP is valid");
+    let encoded = bech32::encode::<bech32::Bech32m>(hrp, bytes)
+        .expect("32-byte data is within Bech32m limits");
+    zewif::SeedFingerprint::new(encoded)
+}
+
 pub mod orchard;
 pub mod sapling;
 pub mod sprout;

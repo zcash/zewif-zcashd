@@ -14,7 +14,13 @@ pub(crate) fn mnemonic_seed_fingerprint(wallet: &ZcashdWallet) -> Option<SeedFin
     if wallet.bip39_mnemonic().mnemonic().is_empty() {
         return None;
     }
-    SeedFingerprint::from_slice(wallet.mnemonic_hd_chain().seed_fp().as_slice()).ok()
+    let bytes: [u8; 32] = wallet
+        .mnemonic_hd_chain()
+        .seed_fp()
+        .as_slice()
+        .try_into()
+        .ok()?;
+    Some(crate::zcashd_wallet::encode_seed_fingerprint(&bytes))
 }
 
 /// The ZIP-32 seed fingerprint of the wallet's pre-mnemonic legacy HD seed, if
@@ -26,7 +32,9 @@ pub(crate) fn legacy_seed_fingerprint(wallet: &ZcashdWallet) -> Result<Option<Se
     };
     let fp = zip32::fingerprint::SeedFingerprint::from_seed(seed.as_slice())
         .ok_or_else(|| anyhow!("Legacy HD seed has an invalid length for ZIP-32 fingerprinting"))?;
-    Ok(Some(SeedFingerprint::new(fp.to_bytes())))
+    Ok(Some(crate::zcashd_wallet::encode_seed_fingerprint(
+        &fp.to_bytes(),
+    )))
 }
 
 /// Build the document's secret store from all spending material the wallet

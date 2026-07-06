@@ -33,6 +33,7 @@ sapling = { package = "sapling-crypto", version = "0.7", features = ["temporary-
 incrementalmerkletree = "0.8"
 bridgetree = "0.7"
 bs58 = { version = "0.5.1", features = ["check"] }
+bech32 = "0.11"
 
 [dev-dependencies]
 bc-rand = "^0.4.0"
