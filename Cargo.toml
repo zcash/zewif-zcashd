@@ -43,4 +43,4 @@ default = []
 with-context = []
 
 [patch.crates-io]
-zewif = { git = "https://github.com/zcash/zewif.git", branch = "feature/cbor-serialization" }
+zewif = { git = "https://github.com/zcash/zewif.git", branch = "main" }
