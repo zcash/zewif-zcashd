@@ -1899,7 +1899,7 @@ dependencies = [
 [[package]]
 name = "zewif"
 version = "0.1.0"
-source = "git+https://github.com/zcash/zewif.git?branch=main#47a75dc94db2ef60bc1de1c971f1a25d06a69db7"
+source = "git+https://github.com/zcash/zewif.git?branch=main#74f1a1694131386515e1733dfb9f414a6284555f"
 dependencies = [
  "hex",
  "minicbor",
