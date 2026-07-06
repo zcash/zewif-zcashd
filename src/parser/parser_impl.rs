@@ -5,9 +5,9 @@
 //! raw bytes. It includes both the low-level `Parser` for byte manipulation and the
 //! higher-level `Parse` and `ParseWithParam` traits for structured type parsing.
 
-use anyhow::{Result, bail};
-
 use zewif::Data;
+
+use super::error::{ParseErrorKind, Result};
 
 /// A trait for types that can be parsed from a binary data stream.
 ///
@@ -23,8 +23,7 @@ use zewif::Data;
 ///
 /// # Examples
 /// ```no_run
-/// # use anyhow::Result;
-/// # use zewif_zcashd::parser::{Parse, Parser};
+/// # use zewif_zcashd::parser::prelude::*;
 /// #
 /// // Implementing Parse for a custom type
 /// struct MyType {
@@ -90,7 +89,6 @@ pub trait Parse {
 /// # Examples
 /// ```no_run
 /// # use zewif_zcashd::parser::prelude::*;
-/// # use anyhow::Result;
 /// #
 /// // A type that needs a parameter during parsing
 /// enum ProofType {
@@ -135,7 +133,6 @@ pub trait ParseWithParam<P> {
 /// # Examples
 /// ```no_run
 /// # use zewif_zcashd::parser::prelude::*;
-/// # use anyhow::Result;
 /// #
 /// # fn example() -> Result<()> {
 /// // Create a parser from raw bytes
@@ -200,19 +197,22 @@ impl<'a> Parser<'a> {
 
     pub fn check_finished(&self) -> Result<()> {
         if self.offset < self.buffer.len() {
-            bail!("Buffer has {} bytes left", self.remaining());
+            return Err(ParseErrorKind::TrailingData {
+                remaining: self.remaining(),
+            }
+            .into());
         }
         Ok(())
     }
 
     pub fn next(&mut self, n: usize) -> Result<&'a [u8]> {
         if self.offset + n > self.buffer.len() {
-            bail!(
-                "Buffer underflow at offset {}, needed {} bytes, only {} remaining",
-                self.offset,
-                n,
-                self.remaining()
-            );
+            return Err(ParseErrorKind::UnexpectedEof {
+                offset: self.offset,
+                needed: n,
+                remaining: self.remaining(),
+            }
+            .into());
         }
         let bytes = &self.buffer[self.offset..self.offset + n];
         self.offset += n;

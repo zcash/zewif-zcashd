@@ -1,4 +1,3 @@
-use anyhow::{Context, Result, bail};
 
 use zewif::Data;
 
@@ -42,10 +41,10 @@ impl Parse for PubKey {
     fn parse(p: &mut Parser) -> Result<Self> {
         let size = *parse!(p, CompactSize, "PubKey size")?;
         if size != 33 && size != 65 {
-            bail!("Invalid PubKey size: {}", size);
+            return Err(ParseErrorKind::InvalidPubKeyLength(size).into());
         }
 
-        let key_data = p.next(size).map(Data::from_slice).context("PubKey")?;
+        let key_data = p.next(size).map(Data::from_slice).with_frame("PubKey")?;
         Ok(Self(key_data))
     }
 }

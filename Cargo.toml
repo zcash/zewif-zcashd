@@ -7,8 +7,8 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 zewif = "0.1.0"
-anyhow = "1.0.95"
 bitflags = "2"
+thiserror = "2"
 chrono = "0.4.39"
 hex = "0.4.3"
 sha2 = "^0.10.6"
@@ -32,13 +32,11 @@ orchard = "0.14"
 sapling = { package = "sapling-crypto", version = "0.7", features = ["temporary-zcashd"] }
 incrementalmerkletree = "0.8"
 bridgetree = "0.7"
+bs58 = { version = "0.5.1", features = ["check"] }
+bech32 = "0.11"
 
 [dev-dependencies]
 bc-rand = "^0.4.0"
 
-[features]
-default = []
-with-context = []
-
 [patch.crates-io]
-zewif = { git = "https://github.com/zcash/zewif.git", rev = "5c3ec020ef8ff9ca02edd60cdda8985a2207cb7d" }
+zewif = { git = "https://github.com/zcash/zewif.git", branch = "main" }

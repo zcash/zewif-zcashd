@@ -1,4 +1,3 @@
-use anyhow::{Result, bail};
 
 use crate::{parse, parser::prelude::*};
 
@@ -27,7 +26,6 @@ use crate::{parse, parser::prelude::*};
 /// # Examples
 /// ```no_run
 /// # use zewif_zcashd::{zcashd_wallet::parse_compact_size, parser::prelude::*};
-/// # use anyhow::Result;
 /// #
 /// # fn example() -> Result<()> {
 /// // Create a buffer with compact size data
@@ -48,27 +46,33 @@ pub fn parse_compact_size(p: &mut Parser) -> Result<usize> {
         0xfd => {
             let n = parse!(p, u16, "compact size")?;
             if n < 253 {
-                bail!("Compact size with 0xfd prefix must be >= 253, got {}", n);
+                return Err(ParseErrorKind::NonCanonicalCompactSize {
+                    prefix: 0xfd,
+                    value: n as u64,
+                }
+                .into());
             }
             Ok(n as usize)
         }
         0xfe => {
             let n = parse!(p, u32, "compact size")?;
             if n < 0x10000 {
-                bail!(
-                    "Compact size with 0xfe prefix must be >= 0x10000, got {}",
-                    n
-                );
+                return Err(ParseErrorKind::NonCanonicalCompactSize {
+                    prefix: 0xfe,
+                    value: n as u64,
+                }
+                .into());
             }
             Ok(n as usize)
         }
         0xff => {
             let n = parse!(p, u64, "compact size")?;
             if n < 0x100000000 {
-                bail!(
-                    "Compact size with 0xff prefix must be >= 0x100000000, got {}",
-                    n
-                );
+                return Err(ParseErrorKind::NonCanonicalCompactSize {
+                    prefix: 0xff,
+                    value: n,
+                }
+                .into());
             }
             Ok(n as usize)
         }
@@ -104,7 +108,6 @@ pub fn parse_compact_size(p: &mut Parser) -> Result<usize> {
 /// # Examples
 /// ```no_run
 /// # use zewif_zcashd::{parse, parser::prelude::*, zcashd_wallet::CompactSize};
-/// # use anyhow::Result;
 /// #
 /// # fn example() -> Result<()> {
 /// // Create a buffer with binary data

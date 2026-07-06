@@ -1,4 +1,3 @@
-use anyhow::Result;
 use ::orchard::keys::IncomingViewingKey;
 use std::collections::HashMap;
 

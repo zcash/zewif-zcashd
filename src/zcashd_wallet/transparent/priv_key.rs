@@ -1,10 +1,9 @@
-use anyhow::{Result, anyhow, bail};
 
 use zewif::Data;
 
 use crate::{
     parse,
-    parser::prelude::*,
+    parser::{error::DerPrivKeyError, prelude::*},
     zcashd_wallet::{CompactSize, u256},
 };
 
@@ -38,7 +37,7 @@ impl PrivKey {
         let mut cursor = 0usize;
 
         if bytes.get(cursor).copied() != Some(0x30) {
-            bail!("PrivKey: expected outer SEQUENCE tag (0x30)");
+            return Err(DerPrivKeyError::ExpectedSequence.into());
         }
         cursor += 1;
 
@@ -49,7 +48,7 @@ impl PrivKey {
         // the tag mismatch below.)
         let len_first = *bytes
             .get(cursor)
-            .ok_or_else(|| anyhow!("PrivKey: truncated SEQUENCE length"))?;
+            .ok_or(DerPrivKeyError::TruncatedLength)?;
         cursor += 1;
         let body_len: usize = if len_first & 0x80 == 0 {
             len_first as usize
@@ -57,46 +56,42 @@ impl PrivKey {
             let n = (len_first & 0x7f) as usize;
             let len_bytes = bytes
                 .get(cursor..cursor.saturating_add(n))
-                .ok_or_else(|| anyhow!("PrivKey: truncated long-form SEQUENCE length"))?;
+                .ok_or(DerPrivKeyError::TruncatedLongFormLength)?;
             cursor += n;
             let mut acc: usize = 0;
             for &b in len_bytes {
                 acc = acc
                     .checked_mul(256)
                     .and_then(|a| a.checked_add(b as usize))
-                    .ok_or_else(|| anyhow!("PrivKey: SEQUENCE length overflow"))?;
+                    .ok_or(DerPrivKeyError::LengthOverflow)?;
             }
             acc
         };
         let body_end = cursor
             .checked_add(body_len)
-            .ok_or_else(|| anyhow!("PrivKey: SEQUENCE end overflow"))?;
+            .ok_or(DerPrivKeyError::EndOverflow)?;
         if body_end != bytes.len() {
-            bail!(
-                "PrivKey: SEQUENCE length {} does not match length of blob remainder ({} bytes)",
-                body_len,
-                bytes.len().saturating_sub(cursor),
-            );
+            return Err(DerPrivKeyError::TruncatedBody.into());
         }
 
         // INTEGER version, value 1.
         if bytes.get(cursor..cursor.saturating_add(3)) != Some(&[0x02, 0x01, 0x01][..]) {
-            bail!("PrivKey: expected INTEGER 1 version field after SEQUENCE");
+            return Err(DerPrivKeyError::ExpectedVersion.into());
         }
         cursor += 3;
 
         // OCTET STRING(32) holding the private scalar.
         if bytes.get(cursor..cursor.saturating_add(2)) != Some(&[0x04, 0x20][..]) {
-            bail!("PrivKey: expected OCTET STRING(32) holding private scalar");
+            return Err(DerPrivKeyError::ExpectedScalar.into());
         }
         cursor += 2;
 
         let end = cursor
             .checked_add(32)
-            .ok_or_else(|| anyhow!("PrivKey: scalar offset overflow"))?;
+            .ok_or(DerPrivKeyError::ScalarOffsetOverflow)?;
         let scalar_bytes = bytes
             .get(cursor..end)
-            .ok_or_else(|| anyhow!("PrivKey: OCTET STRING(32) truncated"))?;
+            .ok_or(DerPrivKeyError::TruncatedScalar)?;
         let mut scalar = [0u8; 32];
         scalar.copy_from_slice(scalar_bytes);
         Ok(scalar)
@@ -125,7 +120,7 @@ impl Parse for PrivKey {
     fn parse(p: &mut Parser) -> Result<Self> {
         let length = *parse!(p, CompactSize, "PrivKey size")?;
         if length != 214 && length != 279 {
-            bail!("Invalid PrivKey size: {}", length);
+            return Err(ParseErrorKind::InvalidPrivKeyLength(length).into());
         }
         let data = parse!(p, data = length, "PrivKey")?;
         let hash = parse!(p, "PrivKey hash")?;

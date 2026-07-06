@@ -1,4 +1,3 @@
-use anyhow::Result;
 use zcash_address::{ToAddress, ZcashAddress};
 
 use crate::{parse, parser::prelude::*, zcashd_wallet::u160};
@@ -10,7 +9,7 @@ use crate::migrate::primitives::address_network_from_zewif;
 pub struct KeyId(u160);
 
 impl KeyId {
-    pub fn to_string(&self, network: Network) -> String {
+    pub fn to_string(&self, network: &Network) -> String {
         // Create proper 20-byte array for the pubkey hash
         let mut pubkey_hash = [0u8; 20];
         pubkey_hash.copy_from_slice(self.0.as_ref());

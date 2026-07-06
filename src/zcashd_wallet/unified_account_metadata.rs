@@ -1,4 +1,3 @@
-use anyhow::{Context, Result};
 use zewif::SeedFingerprint;
 
 use crate::{parse, parser::prelude::*};
@@ -13,13 +12,19 @@ impl UfvkFingerprint {
     }
 
     pub fn from_bytes(xs: &[u8]) -> Result<Self> {
-        let id_bytes = <[u8; 32]>::try_from(xs)
-            .context("Failed to parse UFVK fingerprint from unified account ID bytes")?;
+        let id_bytes = <[u8; 32]>::try_from(xs).map_err(|_| ParseErrorKind::InvalidLength {
+            expected: 32,
+            actual: xs.len(),
+        })?;
         Ok(Self(id_bytes))
     }
 
+    /// Returns the fingerprint as hex in zcashd's display order (byte-reversed,
+    /// matching `uint256::GetHex`), for cross-referencing against zcashd output.
     pub fn to_hex(&self) -> String {
-        hex::encode(self.0)
+        let mut bytes = self.0;
+        bytes.reverse();
+        hex::encode(bytes)
     }
 }
 

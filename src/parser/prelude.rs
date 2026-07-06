@@ -15,7 +15,6 @@
 //!
 //! ```ignore
 //! use zewif_zcashd::parser::prelude::*;
-//! use anyhow::Result;
 //!
 //! struct MyType {}
 //!
@@ -30,6 +29,8 @@
 //! This prelude pattern follows Rust's convention (like the standard library's
 //! `std::prelude`) of providing the most commonly needed imports in a single module.
 
+#[doc(hidden)]
+pub use super::error::{ParseError, ParseErrorKind, ParseResultExt, Result};
 #[doc(hidden)]
 pub use super::parser_impl::*;
 #[doc(hidden)]

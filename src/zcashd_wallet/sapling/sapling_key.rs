@@ -1,8 +1,7 @@
-use anyhow::Result;
 
 use zewif::sapling::SaplingIncomingViewingKey;
 
-use crate::zcashd_wallet::KeyMetadata;
+use crate::{parser::error::Result, zcashd_wallet::KeyMetadata};
 
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1,6 +1,4 @@
 use crate::{parse, parser::prelude::*};
-use anyhow::{Error, Result, bail};
-use zewif::Blob32;
 
 pub const U252_SIZE: usize = 32;
 
@@ -26,17 +24,15 @@ pub const U252_SIZE: usize = 32;
 ///
 /// # Examples
 /// ```
-/// # use zewif::Blob32;
 /// # use zewif_zcashd::zcashd_wallet::u252;
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// # fn example() -> Result<()> {
-/// // Create a blob with the top 4 bits set to zero
+/// // Create a byte array with the top 4 bits set to zero
 /// let mut data = [0u8; 32];
 /// data[0] = 0x0F; // Only using the bottom 4 bits of the first byte
-/// let blob = Blob32::new(data);
 ///
 /// // Convert to u252 (will succeed because top 4 bits are zero)
-/// let value = u252::from_blob(blob)?;
+/// let value = u252::from_bytes(data)?;
 /// # Ok(())
 /// # }
 /// ```
@@ -45,30 +41,27 @@ pub const U252_SIZE: usize = 32;
 pub struct u252([u8; 32]);
 
 impl u252 {
-    /// Creates a new `u252` value from a 32-byte `Blob32`.
+    /// Creates a new `u252` value from a 32-byte `[u8; 32]`.
     ///
     /// This method validates that the most significant 4 bits are zero,
     /// ensuring the value fits within 252 bits as required by Zcash's Orchard protocol.
     ///
     /// # Examples
     /// ```
-    /// # use zewif::Blob32;
     /// # use zewif_zcashd::zcashd_wallet::u252;
-    /// # use anyhow::Result;
+    /// # use zewif_zcashd::parser::error::Result;
     /// # fn example() -> Result<()> {
     /// // Valid u252 (MSB has top 4 bits = 0)
     /// let valid_bytes = [0x0F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
     ///                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
     ///                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
     ///                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
-    /// let valid_blob = Blob32::new(valid_bytes);
-    /// let value = u252::from_blob(valid_blob)?;
+    /// let value = u252::from_bytes(valid_bytes)?;
     ///
     /// // This would fail: top 4 bits are not zero
     /// let invalid_bytes = [0x10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     ///                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    /// let invalid_blob = Blob32::new(invalid_bytes);
-    /// let result = u252::from_blob(invalid_blob);
+    /// let result = u252::from_bytes(invalid_bytes);
     /// assert!(result.is_err());
     /// # Ok(())
     /// # }
@@ -76,16 +69,20 @@ impl u252 {
     ///
     /// # Errors
     /// Returns an error if the most significant 4 bits are not zero.
-    pub fn from_blob(blob: Blob32) -> Result<Self> {
-        Self::from_slice(blob.as_ref())
+    pub fn from_bytes(bytes: [u8; 32]) -> Result<Self> {
+        Self::from_slice(bytes.as_ref())
     }
 
     pub fn from_slice(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != U252_SIZE {
-            bail!("Invalid data length: expected 32, got {}", bytes.len());
+            return Err(ParseErrorKind::InvalidLength {
+                expected: U252_SIZE,
+                actual: bytes.len(),
+            }
+            .into());
         }
         if (bytes[0] & 0xf0) != 0 {
-            bail!("First four bits of u252 must be zero");
+            return Err(ParseErrorKind::U252Overflow.into());
         }
         let mut a = [0u8; U252_SIZE];
         a.copy_from_slice(bytes);
@@ -94,11 +91,15 @@ impl u252 {
 }
 
 impl TryFrom<&[u8]> for u252 {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() != U252_SIZE {
-            bail!("Invalid data length: expected 32, got {}", bytes.len());
+            return Err(ParseErrorKind::InvalidLength {
+                expected: U252_SIZE,
+                actual: bytes.len(),
+            }
+            .into());
         }
         let mut a = [0u8; U252_SIZE];
         a.copy_from_slice(bytes);
@@ -107,7 +108,7 @@ impl TryFrom<&[u8]> for u252 {
 }
 
 impl TryFrom<&[u8; U252_SIZE]> for u252 {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(bytes: &[u8; U252_SIZE]) -> Result<Self, Self::Error> {
         Ok(Self(*bytes))
@@ -115,7 +116,7 @@ impl TryFrom<&[u8; U252_SIZE]> for u252 {
 }
 
 impl TryFrom<&Vec<u8>> for u252 {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(bytes: &Vec<u8>) -> Result<Self, Self::Error> {
         Self::try_from(bytes.as_slice())
@@ -152,7 +153,7 @@ impl std::fmt::Display for u252 {
 
 impl Parse for u252 {
     fn parse(p: &mut Parser) -> Result<Self> {
-        let blob = parse!(p, "u252")?;
-        Self::from_blob(blob)
+        let bytes = parse!(p, "u252")?;
+        Self::from_bytes(bytes)
     }
 }

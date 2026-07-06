@@ -1,4 +1,3 @@
-use anyhow::Result;
 use std::collections::HashMap;
 use zcash_primitives::transaction::Transaction;
 use zewif::{BlockHash, Data};
@@ -155,9 +154,6 @@ impl Parse for WalletTx {
         }
 
         let unparsed_data = p.rest();
-        if !unparsed_data.is_empty() {
-            println!("💔 unparsed_data: {:?}", unparsed_data);
-        }
         assert!(
             unparsed_data.is_empty(),
             "unparsed_data in CWalletTx is not empty"

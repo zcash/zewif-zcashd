@@ -1,4 +1,3 @@
-use anyhow::Result;
 use zewif::TxId;
 
 use crate::{parse, parser::prelude::*};
