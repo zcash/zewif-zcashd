@@ -1,5 +1,3 @@
-use anyhow::{Result, bail};
-
 use crate::{parse, parser::prelude::*, zcashd_wallet::CompactSize};
 
 /// ZCash receiver types used in Unified Addresses.
@@ -25,7 +23,7 @@ impl Parse for ReceiverType {
             0x01 => Ok(ReceiverType::P2SH),
             0x02 => Ok(ReceiverType::Sapling),
             0x03 => Ok(ReceiverType::Orchard),
-            _ => Err(anyhow::anyhow!("Invalid ReceiverType byte: 0x{:02x}", byte)),
+            _ => Err(ParseErrorKind::InvalidReceiverTypeValue(byte as u32).into()),
         }
     }
 }
@@ -42,7 +40,7 @@ impl From<ReceiverType> for String {
 }
 
 impl TryFrom<String> for ReceiverType {
-    type Error = anyhow::Error;
+    type Error = ParseError;
 
     fn try_from(value: String) -> Result<Self> {
         match value.as_str() {
@@ -50,7 +48,7 @@ impl TryFrom<String> for ReceiverType {
             "P2SH" => Ok(ReceiverType::P2SH),
             "Sapling" => Ok(ReceiverType::Sapling),
             "Orchard" => Ok(ReceiverType::Orchard),
-            _ => bail!("Invalid ReceiverType string: {}", value),
+            _ => Err(ParseErrorKind::InvalidReceiverTypeName(value).into()),
         }
     }
 }

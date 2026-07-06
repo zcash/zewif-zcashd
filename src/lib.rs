@@ -1,5 +1,8 @@
 use zewif::mod_use;
 
+mod error;
+pub use error::Error;
+
 mod_use!(bdb_dump);
 mod_use!(zcashd_dump);
 mod_use!(zcashd_parser);

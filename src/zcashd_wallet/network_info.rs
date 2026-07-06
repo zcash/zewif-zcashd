@@ -1,4 +1,3 @@
-use anyhow::{Result, bail};
 use zewif::Network;
 
 use crate::{parse, parser::prelude::*};
@@ -38,7 +37,9 @@ impl Parse for NetworkInfo {
             "main" => Network::Mainnet,
             "test" => Network::Testnet,
             "regtest" => Network::Regtest(Default::default()),
-            other => bail!("Unrecognized zcashd network identifier: {other:?}"),
+            other => {
+                return Err(ParseErrorKind::UnrecognizedNetwork(other.to_string()).into());
+            }
         };
         Ok(Self { zcash, network })
     }

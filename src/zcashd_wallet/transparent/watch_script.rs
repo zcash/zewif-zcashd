@@ -1,4 +1,3 @@
-use anyhow::Result;
 use zewif::{Data, Network, Script};
 
 use crate::{parse, parser::prelude::*, zcashd_wallet::u160};

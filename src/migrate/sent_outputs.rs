@@ -1,8 +1,8 @@
-use anyhow::Result;
 use zcash_transparent::address::TransparentAddress;
 
 use zewif::{Amount, Network, SentOutput, transparent::TransparentSentOutput};
 
+use crate::migrate::MigrateError;
 use crate::{
     ZcashdWallet,
     migrate::WalletAccounts,
@@ -29,7 +29,7 @@ use crate::{
 pub(crate) fn attach_sent_outputs(
     wallet: &ZcashdWallet,
     accounts: &mut WalletAccounts,
-) -> Result<()> {
+) -> Result<(), MigrateError> {
     let legacy_index = accounts.legacy_index;
     let network = wallet.network();
 

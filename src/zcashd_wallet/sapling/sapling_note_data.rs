@@ -1,4 +1,3 @@
-use anyhow::Result;
 use zewif::sapling::SaplingIncomingViewingKey;
 use crate::{parse, parser::prelude::*, zcashd_wallet::IncrementalWitness};
 

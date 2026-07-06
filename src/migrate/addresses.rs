@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{Context, Result, anyhow};
 use secp256k1::PublicKey;
 use zcash_address::{ToAddress, ZcashAddress};
 use zcash_keys::keys::{ReceiverRequirement, UnifiedAddressRequest};
@@ -13,6 +12,7 @@ use zewif::{
     transparent::TransparentSpendAuthority,
 };
 
+use crate::migrate::MigrateError;
 use crate::{
     ZcashdWallet,
     migrate::{
@@ -34,7 +34,7 @@ pub(crate) fn attach_addresses(
     wallet: &ZcashdWallet,
     accounts: &mut WalletAccounts,
     params: &impl consensus::Parameters,
-) -> Result<()> {
+) -> Result<(), MigrateError> {
     attach_transparent_addresses(wallet, accounts)?;
     attach_sapling_addresses(wallet, accounts)?;
     attach_sprout_addresses(wallet, accounts);
@@ -56,7 +56,7 @@ struct TransparentInfo {
 fn attach_transparent_addresses(
     wallet: &ZcashdWallet,
     accounts: &mut WalletAccounts,
-) -> Result<()> {
+) -> Result<(), MigrateError> {
     let network = wallet.network();
     let mut entries: HashMap<String, TransparentInfo> = HashMap::new();
 
@@ -66,7 +66,7 @@ fn attach_transparent_addresses(
     // `Imported` with the private key held in the secret store.
     for keypair in wallet.keys().keypairs() {
         let pk = PublicKey::from_slice(keypair.pubkey().as_slice())
-            .context("parsing transparent public key from keypair")?;
+            .map_err(MigrateError::InvalidPublicKey)?;
         let addr_str = p2pkh_address_string(&pk, network);
         let (authority, scope) = transparent_spend_info(keypair);
         let entry = entries.entry(addr_str).or_default();
@@ -172,7 +172,7 @@ fn p2pkh_address_string(pk: &PublicKey, network: &Network) -> String {
     ZcashAddress::from_transparent_p2pkh(address_network_from_zewif(network), hash).to_string()
 }
 
-fn attach_sapling_addresses(wallet: &ZcashdWallet, accounts: &mut WalletAccounts) -> Result<()> {
+fn attach_sapling_addresses(wallet: &ZcashdWallet, accounts: &mut WalletAccounts) -> Result<(), MigrateError> {
     let network = wallet.network();
     let legacy_index = accounts.legacy_index;
     let mut emitted: HashSet<zewif::sapling::SaplingIncomingViewingKey> = HashSet::new();
@@ -249,18 +249,15 @@ fn attach_unified_addresses(
     wallet: &ZcashdWallet,
     accounts: &mut WalletAccounts,
     params: &impl consensus::Parameters,
-) -> Result<()> {
+) -> Result<(), MigrateError> {
     let unified_accounts = wallet.unified_accounts();
 
     for metadata in &unified_accounts.address_metadata {
         let ufvk = unified_accounts
             .full_viewing_keys
             .get(&metadata.key_id)
-            .ok_or_else(|| {
-                anyhow!(
-                    "No UFVK found for unified address fingerprint {}",
-                    metadata.key_id.to_hex()
-                )
+            .ok_or_else(|| MigrateError::MissingAddressUfvk {
+                fingerprint: metadata.key_id.to_hex(),
             })?;
 
         let j = DiversifierIndex::from(metadata.diversifier_index);
@@ -276,7 +273,7 @@ fn attach_unified_addresses(
             require(metadata.receiver_types.contains(&ReceiverType::Sapling)),
             require(metadata.receiver_types.contains(&ReceiverType::P2PKH)),
         )
-        .map_err(|e| anyhow!("Receiver types do not produce a valid Unified address: {e}"))?;
+        .map_err(MigrateError::InvalidReceiverTypes)?;
 
         let ua_str = ufvk.address(j, request)?.encode(params);
 

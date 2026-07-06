@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
 
-use anyhow::Result;
 use orchard::keys::{IncomingViewingKey as OrchardIvk, Scope};
 
 use zewif::{
@@ -8,6 +7,7 @@ use zewif::{
     SproutOutputData, TreePosition, TxId,
 };
 
+use crate::migrate::MigrateError;
 use crate::{
     ZcashdWallet,
     migrate::WalletAccounts,
@@ -39,7 +39,7 @@ use crate::{
 pub(crate) fn attach_received_outputs(
     wallet: &ZcashdWallet,
     accounts: &mut WalletAccounts,
-) -> Result<()> {
+) -> Result<(), MigrateError> {
     // account index -> txid -> received outputs
     let mut by_account: HashMap<usize, BTreeMap<TxId, Vec<ReceivedOutput>>> = HashMap::new();
     let legacy_index = accounts.legacy_index;

@@ -1,4 +1,3 @@
-use anyhow::Result;
 use bridgetree::BridgeTree;
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::{

@@ -4,9 +4,39 @@ use std::{
     process::{Command, Stdio},
 };
 
-use anyhow::{Result, anyhow, bail};
-
 use zewif::Data;
+
+/// Errors arising while dumping a `wallet.dat` BDB file to records via the
+/// `db_dump` utility.
+#[derive(Debug, thiserror::Error)]
+pub enum BdbDumpError {
+    /// The `db_dump` utility could not be executed.
+    #[error("error executing {} against {}: {source}", db_dump_path.display(), filepath.display())]
+    DbDumpExec {
+        db_dump_path: PathBuf,
+        filepath: PathBuf,
+        source: std::io::Error,
+    },
+
+    /// The `db_dump` utility exited unsuccessfully.
+    #[error("db_dump failed with status {status}: {stderr}")]
+    DbDumpFailed {
+        status: std::process::ExitStatus,
+        stderr: String,
+    },
+
+    /// A data line in the `db_dump` output held invalid hexadecimal.
+    #[error("invalid hex in db_dump output: {0}")]
+    InvalidHex(#[source] zewif::Error),
+
+    /// A key line had no corresponding value line.
+    #[error("found a key without a corresponding value")]
+    UnmatchedKey,
+
+    /// The same key appeared more than once in the dump.
+    #[error("non-uniqueness in keys detected")]
+    NonUniqueKeys,
+}
 
 pub struct BDBDump {
     pub header_records: HashMap<String, String>,
@@ -29,33 +59,31 @@ impl BDBDump {
     /// Dumps the BDB database at `filepath`, automatically resolving the db_dump binary.
     ///
     /// Uses the vendored db_dump if available, falling back to a system-installed version.
-    pub fn from_file(filepath: &Path) -> Result<Self> {
+    pub fn from_file(filepath: &Path) -> Result<Self, BdbDumpError> {
         let db_dump_path = Self::resolve_db_dump_path();
         Self::from_file_with_path(&db_dump_path, filepath)
     }
 
     /// Dumps the BDB database at `filepath` using the specified `db_dump_path` binary.
-    pub fn from_file_with_path(db_dump_path: &Path, filepath: &Path) -> Result<Self> {
+    pub fn from_file_with_path(db_dump_path: &Path, filepath: &Path) -> Result<Self, BdbDumpError> {
         // Execute the `db_dump` utility
         let output = Command::new(db_dump_path)
             .arg(filepath)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
-            .map_err(|e| anyhow!(
-                "Error executing {} against path {}: {}",
-                db_dump_path.display(),
-                filepath.display(),
-                e
-            ))?;
+            .map_err(|source| BdbDumpError::DbDumpExec {
+                db_dump_path: db_dump_path.to_path_buf(),
+                filepath: filepath.to_path_buf(),
+                source,
+            })?;
 
         // Check if db_dump executed successfully
         if !output.status.success() {
-            bail!(
-                "db_dump failed with status: {}\nError: {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            );
+            return Err(BdbDumpError::DbDumpFailed {
+                status: output.status,
+                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+            });
         }
 
         // Convert the stdout to a string for parsing
@@ -103,7 +131,7 @@ impl BDBDump {
             let hex_str = trimmed.trim_start_matches(' ');
 
             // Decode the hexadecimal string
-            let bytes = Data::from_hex(hex_str)?;
+            let bytes = Data::from_hex(hex_str).map_err(BdbDumpError::InvalidHex)?;
 
             // Alternate between key and value
             if current_key.is_none() {
@@ -118,11 +146,11 @@ impl BDBDump {
 
         // Check if there was an unmatched key without a corresponding value
         if current_key.is_some() {
-            bail!("Warning: Found a key without a corresponding value.");
+            return Err(BdbDumpError::UnmatchedKey);
         }
 
         if records_count != data_records.len() {
-            bail!("Warning: Non-uniqueness in keys detected.");
+            return Err(BdbDumpError::NonUniqueKeys);
         }
 
         Ok(BDBDump { header_records, data_records })

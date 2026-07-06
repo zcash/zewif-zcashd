@@ -1,7 +1,7 @@
-use anyhow::Result;
 
 use zewif::{BlockHash, BlockHeight, Secrets, Zewif, ZewifWallet};
 
+use crate::migrate::MigrateError;
 use crate::ZcashdWallet;
 
 use super::{
@@ -17,7 +17,10 @@ use super::{
 /// `export_height` is the chain tip height at export time, supplied by the
 /// caller (zcashd's `wallet.dat` records only a block-hash locator, not a
 /// numeric height). The export block hash is taken from that locator's tip.
-pub fn migrate_to_zewif(wallet: &ZcashdWallet, export_height: BlockHeight) -> Result<Zewif> {
+pub fn migrate_to_zewif(
+    wallet: &ZcashdWallet,
+    export_height: BlockHeight,
+) -> Result<Zewif, MigrateError> {
     let params = wallet.network_info().to_address_encoding_network();
 
     let mut zewif = Zewif::new(export_height, best_block_hash(wallet));

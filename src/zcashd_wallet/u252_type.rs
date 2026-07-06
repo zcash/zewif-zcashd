@@ -1,5 +1,4 @@
 use crate::{parse, parser::prelude::*};
-use anyhow::{Error, Result, bail};
 
 pub const U252_SIZE: usize = 32;
 
@@ -26,7 +25,7 @@ pub const U252_SIZE: usize = 32;
 /// # Examples
 /// ```
 /// # use zewif_zcashd::zcashd_wallet::u252;
-/// # use anyhow::Result;
+/// # use zewif_zcashd::parser::error::Result;
 /// # fn example() -> Result<()> {
 /// // Create a byte array with the top 4 bits set to zero
 /// let mut data = [0u8; 32];
@@ -50,7 +49,7 @@ impl u252 {
     /// # Examples
     /// ```
     /// # use zewif_zcashd::zcashd_wallet::u252;
-    /// # use anyhow::Result;
+    /// # use zewif_zcashd::parser::error::Result;
     /// # fn example() -> Result<()> {
     /// // Valid u252 (MSB has top 4 bits = 0)
     /// let valid_bytes = [0x0F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
@@ -76,10 +75,14 @@ impl u252 {
 
     pub fn from_slice(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != U252_SIZE {
-            bail!("Invalid data length: expected 32, got {}", bytes.len());
+            return Err(ParseErrorKind::InvalidLength {
+                expected: U252_SIZE,
+                actual: bytes.len(),
+            }
+            .into());
         }
         if (bytes[0] & 0xf0) != 0 {
-            bail!("First four bits of u252 must be zero");
+            return Err(ParseErrorKind::U252Overflow.into());
         }
         let mut a = [0u8; U252_SIZE];
         a.copy_from_slice(bytes);
@@ -88,11 +91,15 @@ impl u252 {
 }
 
 impl TryFrom<&[u8]> for u252 {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() != U252_SIZE {
-            bail!("Invalid data length: expected 32, got {}", bytes.len());
+            return Err(ParseErrorKind::InvalidLength {
+                expected: U252_SIZE,
+                actual: bytes.len(),
+            }
+            .into());
         }
         let mut a = [0u8; U252_SIZE];
         a.copy_from_slice(bytes);
@@ -101,7 +108,7 @@ impl TryFrom<&[u8]> for u252 {
 }
 
 impl TryFrom<&[u8; U252_SIZE]> for u252 {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(bytes: &[u8; U252_SIZE]) -> Result<Self, Self::Error> {
         Ok(Self(*bytes))
@@ -109,7 +116,7 @@ impl TryFrom<&[u8; U252_SIZE]> for u252 {
 }
 
 impl TryFrom<&Vec<u8>> for u252 {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(bytes: &Vec<u8>) -> Result<Self, Self::Error> {
         Self::try_from(bytes.as_slice())

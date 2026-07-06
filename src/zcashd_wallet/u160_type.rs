@@ -1,4 +1,3 @@
-use anyhow::{Context, Error, Result, bail};
 
 use crate::{parse, parser::prelude::*};
 
@@ -24,8 +23,8 @@ pub const U160_SIZE: usize = 20;
 ///
 /// # Examples
 /// ```
-/// # use anyhow::Result;
 /// # use zewif_zcashd::zcashd_wallet::u160;
+/// # use zewif_zcashd::parser::error::Result;
 /// # fn example() -> Result<()> {
 /// // Create a u160 from a byte slice (e.g., for a P2PKH address hash)
 /// let address_bytes = [
@@ -59,8 +58,8 @@ impl u160 {
     ///
     /// # Examples
     /// ```
-    /// # use anyhow::Result;
     /// # use zewif_zcashd::zcashd_wallet::{u160, U160_SIZE};
+    /// # use zewif_zcashd::parser::error::Result;
     /// # fn example() -> Result<()> {
     /// // Valid slice (exactly 20 bytes)
     /// let valid_bytes = [0u8; U160_SIZE];
@@ -77,16 +76,20 @@ impl u160 {
     /// # Errors
     /// Returns an error if the byte slice is not exactly 20 bytes long.
     pub fn from_slice(bytes: &[u8]) -> Result<Self> {
-        Self::try_from(bytes).context("Creating U160 from slice")
+        Self::try_from(bytes).with_frame("u160")
     }
 }
 
 impl TryFrom<&[u8]> for u160 {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() != U160_SIZE {
-            bail!("Invalid data length: expected 20, got {}", bytes.len());
+            return Err(ParseErrorKind::InvalidLength {
+                expected: U160_SIZE,
+                actual: bytes.len(),
+            }
+            .into());
         }
         let mut a = [0u8; U160_SIZE];
         a.copy_from_slice(bytes);
@@ -95,7 +98,7 @@ impl TryFrom<&[u8]> for u160 {
 }
 
 impl TryFrom<&[u8; U160_SIZE]> for u160 {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(bytes: &[u8; U160_SIZE]) -> Result<Self, Self::Error> {
         Ok(Self(*bytes))
@@ -103,7 +106,7 @@ impl TryFrom<&[u8; U160_SIZE]> for u160 {
 }
 
 impl TryFrom<&Vec<u8>> for u160 {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(bytes: &Vec<u8>) -> Result<Self, Self::Error> {
         Self::try_from(bytes.as_slice())

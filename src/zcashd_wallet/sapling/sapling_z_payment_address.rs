@@ -1,4 +1,3 @@
-use anyhow::Result;
 use zcash_address::{ToAddress, ZcashAddress};
 use zewif::Network;
 

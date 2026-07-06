@@ -1,4 +1,3 @@
-use anyhow::Result;
 
 use super::IncrementalMerkleTree;
 use crate::{parse, parser::prelude::*};

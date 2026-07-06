@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use anyhow::{Context, Result};
 use zewif::{
     BlockHash, BlockHeight, Data, RawTxData, Transaction, TransactionData, TxBlockPosition, TxId,
 };
 
+use crate::migrate::MigrateError;
 use crate::{ZcashdWallet, zcashd_wallet::WalletTx};
 
 /// Build the global transaction table and, as a by-product, a map from txid to
@@ -12,12 +12,16 @@ use crate::{ZcashdWallet, zcashd_wallet::WalletTx};
 /// transactions that contributed to the Orchard note commitment tree).
 pub(crate) fn convert_transactions(
     wallet: &ZcashdWallet,
-) -> Result<HashMap<TxId, Transaction>> {
+) -> Result<HashMap<TxId, Transaction>, MigrateError> {
     let tx_heights = collect_tx_heights(wallet);
     let mut transactions = HashMap::new();
     for (txid, wtx) in wallet.transactions() {
-        let tx = convert_transaction(*txid, wtx, &tx_heights)
-            .with_context(|| format!("Failed to convert transaction {txid}"))?;
+        let tx = convert_transaction(*txid, wtx, &tx_heights).map_err(|source| {
+            MigrateError::TransactionConversion {
+                txid: *txid,
+                source: Box::new(source),
+            }
+        })?;
         transactions.insert(*txid, tx);
     }
     Ok(transactions)
@@ -38,7 +42,7 @@ fn convert_transaction(
     txid: TxId,
     wtx: &WalletTx,
     tx_heights: &HashMap<[u8; 32], u32>,
-) -> Result<Transaction> {
+) -> Result<Transaction, MigrateError> {
     let mut tx = Transaction::new(txid);
 
     // Re-serialize the parsed transaction to its canonical bytes. The parser
@@ -46,7 +50,7 @@ fn convert_transaction(
     let mut raw = Vec::new();
     wtx.transaction()
         .write(&mut raw)
-        .context("re-serializing parsed transaction to raw bytes")?;
+        .map_err(MigrateError::TransactionSerialization)?;
     tx.set_tx_data(TransactionData::Raw(RawTxData::new(Data::from_vec(raw))));
 
     // Block linkage: a non-zero block hash and a non-negative in-block index

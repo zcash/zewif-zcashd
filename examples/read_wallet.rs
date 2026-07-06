@@ -7,7 +7,6 @@
 
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
 use zewif::BlockHeight;
 use zewif_zcashd::{BDBDump, ZcashdDump, ZcashdParser, migrate_to_zewif};
 
@@ -18,7 +17,7 @@ fn default_wallet_path() -> PathBuf {
     home.join(".zcash").join("wallet.dat")
 }
 
-fn main() -> Result<()> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
     let path: PathBuf = args
         .next()
@@ -31,12 +30,9 @@ fn main() -> Result<()> {
 
     println!("Reading wallet: {}", path.display());
 
-    let bdb = BDBDump::from_file(&path)
-        .with_context(|| format!("failed to db_dump {}", path.display()))?;
-    let dump = ZcashdDump::from_bdb_dump(&bdb, false)
-        .context("failed to collect BDB key/value records")?;
-    let (wallet, unparsed) =
-        ZcashdParser::parse_dump(&dump, false).context("failed to parse zcashd wallet records")?;
+    let bdb = BDBDump::from_file(&path)?;
+    let dump = ZcashdDump::from_bdb_dump(&bdb, false)?;
+    let (wallet, unparsed) = ZcashdParser::parse_dump(&dump, false)?;
 
     println!("\n=== Wallet summary ===");
     println!("network:            {:?}", wallet.network());
@@ -60,7 +56,7 @@ fn main() -> Result<()> {
     let export_height = BlockHeight::from_u32(2_400_000);
 
     println!("\n=== ZeWIF migration ===");
-    let zewif = migrate_to_zewif(&wallet, export_height).context("migration failed")?;
+    let zewif = migrate_to_zewif(&wallet, export_height)?;
     for w in zewif.wallets() {
         println!("accounts:      {}", w.accounts().len());
         println!("address book:  {}", w.address_book().len());
@@ -75,8 +71,8 @@ fn main() -> Result<()> {
         }
     );
 
-    let bytes = zewif.to_bytes().context("serializing ZeWIF document")?;
-    std::fs::write(&out_path, &bytes).with_context(|| format!("writing {}", out_path.display()))?;
+    let bytes = zewif.to_bytes()?;
+    std::fs::write(&out_path, &bytes)?;
     println!("\nWrote {} bytes to {}", bytes.len(), out_path.display());
 
     Ok(())

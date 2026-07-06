@@ -1,4 +1,3 @@
-use anyhow::{Result, anyhow};
 
 use zewif::{
     SecretStore, SeedEntry, SeedFingerprint, SeedMaterial, SproutKeyEntry,
@@ -6,6 +5,7 @@ use zewif::{
     transparent::TransparentSpendingKey,
 };
 
+use crate::migrate::MigrateError;
 use crate::{ZcashdWallet, migrate::addresses::sprout_address_string};
 
 /// The ZIP-32 seed fingerprint of the wallet's mnemonic seed, if a mnemonic is
@@ -26,12 +26,12 @@ pub(crate) fn mnemonic_seed_fingerprint(wallet: &ZcashdWallet) -> Option<SeedFin
 /// The ZIP-32 seed fingerprint of the wallet's pre-mnemonic legacy HD seed, if
 /// present. Recomputed from the seed bytes per ZIP-32 (the seed types no longer
 /// carry the fingerprint).
-pub(crate) fn legacy_seed_fingerprint(wallet: &ZcashdWallet) -> Result<Option<SeedFingerprint>> {
+pub(crate) fn legacy_seed_fingerprint(wallet: &ZcashdWallet) -> Result<Option<SeedFingerprint>, MigrateError> {
     let Some(seed) = wallet.legacy_hd_seed() else {
         return Ok(None);
     };
     let fp = zip32::fingerprint::SeedFingerprint::from_seed(seed.as_slice())
-        .ok_or_else(|| anyhow!("Legacy HD seed has an invalid length for ZIP-32 fingerprinting"))?;
+        .ok_or(MigrateError::InvalidLegacySeedLength)?;
     Ok(Some(crate::zcashd_wallet::encode_seed_fingerprint(
         &fp.to_bytes(),
     )))
@@ -44,7 +44,7 @@ pub(crate) fn legacy_seed_fingerprint(wallet: &ZcashdWallet) -> Result<Option<Se
 /// Sprout spending keys (keyed by address).
 ///
 /// Returns `None` when no secret material is present (a viewing-only export).
-pub(crate) fn build_secret_store(wallet: &ZcashdWallet) -> Result<Option<SecretStore>> {
+pub(crate) fn build_secret_store(wallet: &ZcashdWallet) -> Result<Option<SecretStore>, MigrateError> {
     let mut store = SecretStore::new();
 
     // Seeds.
@@ -175,12 +175,12 @@ fn transparent_key_entry(
     pubkey: &[u8],
     privkey: &crate::zcashd_wallet::transparent::PrivKey,
     network: &zewif::Network,
-) -> Result<TransparentKeyEntry> {
+) -> Result<TransparentKeyEntry, MigrateError> {
     let pubkey = zewif::transparent::TransparentPubKey::from_bytes(pubkey.to_vec())
-        .map_err(|e| anyhow!("invalid public key: {e}"))?;
+        .map_err(MigrateError::InvalidTransparentPubKey)?;
     let scalar = privkey
         .secp256k1_scalar()
-        .map_err(|e| anyhow!("undecodable private key: {e}"))?;
+        .map_err(MigrateError::InvalidPrivateKey)?;
     let version: u8 = match network {
         zewif::Network::Mainnet => 0x80,
         _ => 0xEF,

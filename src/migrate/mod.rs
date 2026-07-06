@@ -1,5 +1,6 @@
 use zewif::mod_use;
 
+mod_use!(error);
 mod_use!(migrate_to_zewif);
 mod_use!(accounts);
 mod_use!(addresses);

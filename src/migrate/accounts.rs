@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use anyhow::{Context, Result};
 use zcash_keys::keys::UnifiedFullViewingKey;
 use zcash_protocol::consensus;
 
@@ -9,6 +8,7 @@ use zewif::{
     KeySource, NonHardenedChildIndex,
 };
 
+use crate::migrate::MigrateError;
 use crate::{
     ZcashdWallet,
     migrate::secrets::{legacy_seed_fingerprint, mnemonic_seed_fingerprint},
@@ -50,7 +50,7 @@ pub(crate) struct WalletAccounts {
 pub(crate) fn build_accounts(
     wallet: &ZcashdWallet,
     params: &impl consensus::Parameters,
-) -> Result<WalletAccounts> {
+) -> Result<WalletAccounts, MigrateError> {
     let mut accounts = Vec::new();
     let mut ufvk_index = HashMap::new();
     let mut unified = Vec::new();
@@ -65,11 +65,8 @@ pub(crate) fn build_accounts(
         let ufvk = unified_accounts
             .full_viewing_keys
             .get(ufvk_fp)
-            .with_context(|| {
-                format!(
-                    "No UFVK found for unified account fingerprint {}",
-                    ufvk_fp.to_hex()
-                )
+            .ok_or_else(|| MigrateError::MissingAccountUfvk {
+                fingerprint: ufvk_fp.to_hex(),
             })?;
 
         let encoding = ufvk.encode(params);

@@ -1,4 +1,3 @@
-use anyhow::{Error, Result, bail};
 
 use crate::{parse, parser::prelude::*};
 
@@ -50,9 +49,13 @@ impl u256 {
     /// // Parse the hash of the Zcash genesis block.
     /// let block_hash = u256::from_hex("00040fe8ec8471911baa1db1266ea15dd06b4a8a5c453883c000b031973dce08").unwrap();
     /// ```
-    pub fn from_hex(hex: &str) -> anyhow::Result<Self> {
+    pub fn from_hex(hex: &str) -> Result<Self> {
         let mut bytes = [0u8; U256_SIZE];
-        hex::decode_to_slice(hex, &mut bytes)?;
+        hex::decode_to_slice(hex, &mut bytes)
+            .map_err(|_| ParseErrorKind::InvalidLength {
+                expected: U256_SIZE,
+                actual: hex.len() / 2,
+            })?;
         bytes.reverse();
         Ok(Self(bytes))
     }
@@ -63,11 +66,15 @@ impl u256 {
 }
 
 impl TryFrom<&[u8]> for u256 {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() != U256_SIZE {
-            bail!("Invalid data length: expected 32, got {}", bytes.len());
+            return Err(ParseErrorKind::InvalidLength {
+                expected: U256_SIZE,
+                actual: bytes.len(),
+            }
+            .into());
         }
         let mut a = [0u8; U256_SIZE];
         a.copy_from_slice(bytes);
@@ -76,7 +83,7 @@ impl TryFrom<&[u8]> for u256 {
 }
 
 impl TryFrom<&[u8; U256_SIZE]> for u256 {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(bytes: &[u8; U256_SIZE]) -> Result<Self, Self::Error> {
         Ok(Self(*bytes))
@@ -84,7 +91,7 @@ impl TryFrom<&[u8; U256_SIZE]> for u256 {
 }
 
 impl TryFrom<&Vec<u8>> for u256 {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(bytes: &Vec<u8>) -> Result<Self, Self::Error> {
         Self::try_from(bytes.as_slice())
