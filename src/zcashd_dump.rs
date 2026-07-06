@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 use hex::ToHex;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 
 use super::BDBDump;
@@ -87,14 +87,14 @@ impl AsRef<[u8]> for DBValue {
 
 #[derive(Debug)]
 pub struct ZcashdDump {
-    records: HashMap<DBKey, DBValue>,
-    keys_by_keyname: HashMap<String, HashSet<DBKey>>,
+    records: BTreeMap<DBKey, DBValue>,
+    keys_by_keyname: BTreeMap<String, BTreeSet<DBKey>>,
 }
 
 impl ZcashdDump {
     pub fn from_bdb_dump(berkeley_dump: &BDBDump, strict: bool) -> Result<Self> {
-        let mut records: HashMap<DBKey, DBValue> = HashMap::new();
-        let mut keys_by_keyname: HashMap<String, HashSet<DBKey>> = HashMap::new();
+        let mut records: BTreeMap<DBKey, DBValue> = BTreeMap::new();
+        let mut keys_by_keyname: BTreeMap<String, BTreeSet<DBKey>> = BTreeMap::new();
 
         for (key_data, value_data) in &berkeley_dump.data_records {
             match DBKey::parse_data(key_data) {
@@ -125,7 +125,7 @@ impl ZcashdDump {
         })
     }
 
-    pub fn records(&self) -> &HashMap<DBKey, DBValue> {
+    pub fn records(&self) -> &BTreeMap<DBKey, DBValue> {
         &self.records
     }
 
@@ -151,16 +151,16 @@ impl ZcashdDump {
         self.records.contains_key(&key)
     }
 
-    pub fn keys_by_keyname(&self) -> &HashMap<String, HashSet<DBKey>> {
+    pub fn keys_by_keyname(&self) -> &BTreeMap<String, BTreeSet<DBKey>> {
         &self.keys_by_keyname
     }
 
-    pub fn records_for_keyname(&self, keyname: &str) -> Result<HashMap<DBKey, DBValue>> {
+    pub fn records_for_keyname(&self, keyname: &str) -> Result<BTreeMap<DBKey, DBValue>> {
         let keys = self
             .keys_by_keyname
             .get(keyname)
             .context(format!("No records found for keyname: {}", keyname))?;
-        let mut records = HashMap::new();
+        let mut records = BTreeMap::new();
         for key in keys {
             let value = self.value_for_key(key)?;
             records.insert(key.clone(), value.clone());

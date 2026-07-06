@@ -64,42 +64,61 @@ pub(crate) fn build_secret_store(wallet: &ZcashdWallet) -> Result<Option<SecretS
     // Transparent private keys, keyed by public key. The legacy `key`/`keys`
     // records and the encrypted-comment `wkey` records both carry spendable
     // secp256k1 keys.
-    for keypair in wallet.keys().keypairs() {
-        match transparent_key_entry(keypair.pubkey().as_slice(), keypair.privkey(), wallet.network()) {
+    let mut transparent_sources: Vec<(&[u8], &crate::zcashd_wallet::transparent::PrivKey)> = wallet
+        .keys()
+        .keypairs()
+        .map(|keypair| (keypair.pubkey().as_slice(), keypair.privkey()))
+        .collect();
+    if let Some(wallet_keys) = wallet.wallet_keys() {
+        transparent_sources.extend(
+            wallet_keys
+                .keypairs()
+                .map(|wkey| (wkey.pubkey().as_slice(), wkey.privkey())),
+        );
+    }
+    // Emit in a deterministic (pubkey-sorted) order.
+    transparent_sources.sort_by_key(|(pubkey, _)| *pubkey);
+    for (pubkey, privkey) in transparent_sources {
+        match transparent_key_entry(pubkey, privkey, wallet.network()) {
             Ok(entry) => store.add_transparent_key(entry),
             Err(e) => eprintln!("warning: skipping transparent key: {e}"),
-        }
-    }
-    if let Some(wallet_keys) = wallet.wallet_keys() {
-        for wkey in wallet_keys.keypairs() {
-            match transparent_key_entry(wkey.pubkey().as_slice(), wkey.privkey(), wallet.network()) {
-                Ok(entry) => store.add_transparent_key(entry),
-                Err(e) => eprintln!("warning: skipping wkey transparent key: {e}"),
-            }
         }
     }
 
     // Sapling extended spending keys, keyed by their extended full viewing key
     // encoding (169 bytes, ZIP-32).
     let (extsk_hrp, extfvk_hrp) = sapling_hrps(wallet.network());
-    for sapling_key in wallet.sapling_keys().keypairs() {
-        let extsk = sapling_key.extsk();
-        #[allow(deprecated)]
-        let efvk = extsk.to_extended_full_viewing_key();
-        store.add_sapling_key(zewif::SaplingKeyEntry::new(
-            zewif::sapling::SaplingExtendedFullViewingKey::new(
+    let mut sapling_entries: Vec<(String, String)> = wallet
+        .sapling_keys()
+        .keypairs()
+        .map(|sapling_key| {
+            let extsk = sapling_key.extsk();
+            #[allow(deprecated)]
+            let efvk = extsk.to_extended_full_viewing_key();
+            (
                 zcash_keys::encoding::encode_extended_full_viewing_key(extfvk_hrp, &efvk),
-            ),
-            SaplingExtendedSpendingKey::new(zcash_keys::encoding::encode_extended_spending_key(
-                extsk_hrp, extsk,
-            )),
+                zcash_keys::encoding::encode_extended_spending_key(extsk_hrp, extsk),
+            )
+        })
+        .collect();
+    // Emit in a deterministic (viewing-key-sorted) order.
+    sapling_entries.sort();
+    for (efvk, extsk) in sapling_entries {
+        store.add_sapling_key(zewif::SaplingKeyEntry::new(
+            zewif::sapling::SaplingExtendedFullViewingKey::new(efvk),
+            SaplingExtendedSpendingKey::new(extsk),
         ));
     }
 
     // Sprout spending keys, keyed by address.
     if let Some(sprout_keys) = wallet.sprout_keys() {
-        for (address, sk) in sprout_keys.iter() {
-            let address_str = sprout_address_string(address, wallet.network());
+        // Emit in a deterministic (address-sorted) order.
+        let mut sprout_entries: Vec<(String, _)> = sprout_keys
+            .iter()
+            .map(|(address, sk)| (sprout_address_string(address, wallet.network()), sk))
+            .collect();
+        sprout_entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+        for (address_str, sk) in sprout_entries {
             let key_bytes: [u8; 32] = *AsRef::<[u8; 32]>::as_ref(&sk.key());
             // Canonical Base58Check encoding: the 2-byte network version
             // prefix (zcashd base58Prefixes[ZCSPENDING_KEY]) followed by
