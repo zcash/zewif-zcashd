@@ -57,14 +57,14 @@ pub(crate) fn build_secret_store(wallet: &ZcashdWallet) -> Result<Option<SecretS
     // records and the encrypted-comment `wkey` records both carry spendable
     // secp256k1 keys.
     for keypair in wallet.keys().keypairs() {
-        match transparent_key_entry(keypair.pubkey().as_slice(), keypair.privkey()) {
+        match transparent_key_entry(keypair.pubkey().as_slice(), keypair.privkey(), wallet.network()) {
             Ok(entry) => store.add_transparent_key(entry),
             Err(e) => eprintln!("warning: skipping transparent key: {e}"),
         }
     }
     if let Some(wallet_keys) = wallet.wallet_keys() {
         for wkey in wallet_keys.keypairs() {
-            match transparent_key_entry(wkey.pubkey().as_slice(), wkey.privkey()) {
+            match transparent_key_entry(wkey.pubkey().as_slice(), wkey.privkey(), wallet.network()) {
                 Ok(entry) => store.add_transparent_key(entry),
                 Err(e) => eprintln!("warning: skipping wkey transparent key: {e}"),
             }
@@ -73,14 +73,18 @@ pub(crate) fn build_secret_store(wallet: &ZcashdWallet) -> Result<Option<SecretS
 
     // Sapling extended spending keys, keyed by their extended full viewing key
     // encoding (169 bytes, ZIP-32).
+    let (extsk_hrp, extfvk_hrp) = sapling_hrps(wallet.network());
     for sapling_key in wallet.sapling_keys().keypairs() {
         let extsk = sapling_key.extsk();
-        let fvk_bytes = sapling_extfvk_bytes(extsk)?;
-        let fvk = zewif::sapling::SaplingExtendedFullViewingKey::from_vec(fvk_bytes)
-            .map_err(|_| anyhow!("Sapling extended FVK encoding must be 169 bytes"))?;
+        #[allow(deprecated)]
+        let efvk = extsk.to_extended_full_viewing_key();
         store.add_sapling_key(zewif::SaplingKeyEntry::new(
-            fvk,
-            SaplingExtendedSpendingKey::new(extsk.to_bytes()),
+            zewif::sapling::SaplingExtendedFullViewingKey::new(
+                zcash_keys::encoding::encode_extended_full_viewing_key(extfvk_hrp, &efvk),
+            ),
+            SaplingExtendedSpendingKey::new(zcash_keys::encoding::encode_extended_spending_key(
+                extsk_hrp, extsk,
+            )),
         ));
     }
 
@@ -89,19 +93,19 @@ pub(crate) fn build_secret_store(wallet: &ZcashdWallet) -> Result<Option<SecretS
         for (address, sk) in sprout_keys.iter() {
             let address_str = sprout_address_string(address, wallet.network());
             let key_bytes: [u8; 32] = *AsRef::<[u8; 32]>::as_ref(&sk.key());
-            // The canonical Sprout spending key encoding is the 2-byte
-            // network version prefix followed by a_sk (zcashd
-            // base58Prefixes[ZCSPENDING_KEY]).
+            // Canonical Base58Check encoding: the 2-byte network version
+            // prefix (zcashd base58Prefixes[ZCSPENDING_KEY]) followed by
+            // the padded a_sk, then check-encoded ("SK..." / "ST...").
             let prefix: [u8; 2] = match wallet.network() {
                 zewif::Network::Mainnet => [0xAB, 0x36],
                 _ => [0xAC, 0x08],
             };
-            let mut encoded = [0u8; 34];
-            encoded[..2].copy_from_slice(&prefix);
-            encoded[2..].copy_from_slice(&key_bytes);
+            let mut payload = Vec::with_capacity(34);
+            payload.extend_from_slice(&prefix);
+            payload.extend_from_slice(&key_bytes);
             store.add_sprout_key(SproutKeyEntry::new(
                 address_str,
-                SproutSpendingKey::new(encoded),
+                SproutSpendingKey::new(bs58::encode(payload).with_check().into_string()),
             ));
         }
     }
@@ -116,28 +120,53 @@ pub(crate) fn build_secret_store(wallet: &ZcashdWallet) -> Result<Option<SecretS
 
 /// Serialize a Sapling extended spending key's corresponding extended full
 /// viewing key into its canonical 169-byte ZIP-32 encoding.
-fn sapling_extfvk_bytes(extsk: &::sapling::zip32::ExtendedSpendingKey) -> Result<Vec<u8>> {
-    #[allow(deprecated)]
-    let efvk = extsk.to_extended_full_viewing_key();
-    let mut bytes = Vec::with_capacity(169);
-    efvk.write(&mut bytes)
-        .map_err(|e| anyhow!("Serializing Sapling extended full viewing key: {e}"))?;
-    Ok(bytes)
+/// The ZIP 32 Bech32 Human-Readable Parts for Sapling extended keys on the
+/// given network: (extended spending key, extended full viewing key).
+fn sapling_hrps(network: &zewif::Network) -> (&'static str, &'static str) {
+    use zcash_protocol::constants::{mainnet, regtest, testnet};
+    match network {
+        zewif::Network::Mainnet => (
+            mainnet::HRP_SAPLING_EXTENDED_SPENDING_KEY,
+            mainnet::HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY,
+        ),
+        zewif::Network::Testnet => (
+            testnet::HRP_SAPLING_EXTENDED_SPENDING_KEY,
+            testnet::HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY,
+        ),
+        _ => (
+            regtest::HRP_SAPLING_EXTENDED_SPENDING_KEY,
+            regtest::HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY,
+        ),
+    }
 }
 
 /// Builds a transparent secret-store entry from a serialized public key and
-/// the corresponding private key record.
+/// the corresponding private key record. The private key is emitted in its
+/// canonical WIF Base58Check encoding; a compressed public key (33 bytes)
+/// selects the compressed WIF form.
 fn transparent_key_entry(
     pubkey: &[u8],
     privkey: &crate::zcashd_wallet::transparent::PrivKey,
+    network: &zewif::Network,
 ) -> Result<TransparentKeyEntry> {
     let pubkey = zewif::transparent::TransparentPubKey::from_bytes(pubkey.to_vec())
         .map_err(|e| anyhow!("invalid public key: {e}"))?;
     let scalar = privkey
         .secp256k1_scalar()
         .map_err(|e| anyhow!("undecodable private key: {e}"))?;
+    let version: u8 = match network {
+        zewif::Network::Mainnet => 0x80,
+        _ => 0xEF,
+    };
+    let mut payload = Vec::with_capacity(34);
+    payload.push(version);
+    payload.extend_from_slice(&scalar);
+    if pubkey.is_compressed() {
+        payload.push(0x01);
+    }
+    let wif = bs58::encode(payload).with_check().into_string();
     Ok(TransparentKeyEntry::new(
         pubkey,
-        TransparentSpendingKey::new(scalar),
+        TransparentSpendingKey::new(wif),
     ))
 }

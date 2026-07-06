@@ -32,6 +32,7 @@ orchard = "0.14"
 sapling = { package = "sapling-crypto", version = "0.7", features = ["temporary-zcashd"] }
 incrementalmerkletree = "0.8"
 bridgetree = "0.7"
+bs58 = { version = "0.5.1", features = ["check"] }
 
 [dev-dependencies]
 bc-rand = "^0.4.0"
