@@ -1,8 +1,8 @@
 use std::{env, fs, path::Path, process::Command};
 
-const BDB_TARBALL: &str = "vendor/db-6.2.32.tar.gz";
-const BDB_DIR_NAME: &str = "db-6.2.32";
-const BDB_SHA256: &str = "a9c5e2b004a5777aa03510cfe5cd766a4a3b777713406b02809c17c8e0e7a8fb";
+const BDB_TARBALL: &str = "vendor/db-6.2.23.tar.gz";
+const BDB_DIR_NAME: &str = "db-6.2.23";
+const BDB_SHA256: &str = "47612c8991aa9ac2f6be721267c8d3cdccf5ac83105df8e50809daea24e95dc7";
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
@@ -69,7 +69,7 @@ fn build_berkeley_db() -> Result<(), String> {
         }
     }
 
-    // Configure (BDB 6.2.32 has pointer-type mismatches that newer GCC treats as errors)
+    // Configure (BDB 6.2.23 has pointer-type mismatches that newer GCC treats as errors)
     let configure_output = Command::new("../dist/configure")
         .args([
             "--disable-shared",
