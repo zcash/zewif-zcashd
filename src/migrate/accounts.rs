@@ -11,7 +11,7 @@ use zewif::{
 use crate::migrate::MigrateError;
 use crate::{
     ZcashdWallet,
-    migrate::secrets::{legacy_seed_fingerprint, mnemonic_seed_fingerprint},
+    migrate::secrets::mnemonic_seed_fingerprint,
     zcashd_wallet::UfvkFingerprint,
 };
 
@@ -94,12 +94,18 @@ pub(crate) fn build_accounts(
     // legacy Sapling, and Sprout addresses (zcashd account 0x7FFFFFFF).
     let mut legacy = Account::new(AccountViewingKey::TransparentAddressSet);
     legacy.set_name("Legacy");
-    // The legacy account can derive additional addresses from the wallet's
-    // seed at account index 0x7FFFFFFF. Prefer the pre-mnemonic legacy seed
-    // (the origin of a pre-v4.7.0 wallet's random keys) when present, else the
-    // mnemonic seed (post-v4.7.0 legacy derivation). A wallet with neither is
-    // a bag of imported keys.
-    match legacy_seed_fingerprint(wallet)?.or_else(|| mnemonic_seed_fingerprint(wallet)) {
+    // The mnemonic seed is the only seed from which zcashd ever derives keys
+    // at account index 0x7FFFFFFF: post-v4.7.0 `getnewaddress` transparent
+    // keys (m/44'/coin'/0x7FFFFFFF'/change/index) and post-v4.7.0
+    // `z_getnewaddress` Sapling keys (m/32'/coin'/0x7FFFFFFF'/idx'). The
+    // pre-mnemonic legacy seed only ever derived Sapling keys, at
+    // m/32'/coin'/account' (pre-v4.7.0), and pre-v4.7.0 transparent keys are
+    // plain system randomness. A wallet without a mnemonic therefore has no
+    // derivation root for this account: its keys are a bag of imported
+    // material whose secrets (including the legacy seed itself, from which
+    // pre-v4.7.0 Sapling keys can be re-derived) are individually present in
+    // the secret store.
+    match mnemonic_seed_fingerprint(wallet) {
         Some(seed_fp) => {
             legacy.set_key_source(KeySource::Derived(DerivedKeySource::new(
                 seed_fp,
