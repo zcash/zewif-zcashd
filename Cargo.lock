@@ -86,6 +86,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32637268377fc7b10a8c6d51de3e7fba1ce5dd371a96e342b34e6078db558e7f"
 
 [[package]]
+name = "bech32"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efbd3e1070bbdf4cd88a75264e18e8a26f7cb5c6949eadf0ceb85fb159cf08f8"
+
+[[package]]
 name = "bellman"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1695,7 +1701,7 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58342d0aaa8e2fa98849636f52800ac4bf020574c944c974742fc933db58cac2"
 dependencies = [
- "bech32",
+ "bech32 0.11.1",
  "bs58",
  "corez",
  "f4jumble",
@@ -1720,7 +1726,7 @@ version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fbcdfbb5c8edb247439d72a397abaae9b7dd14a1c070e7e4fc3536924f9065f"
 dependencies = [
- "bech32",
+ "bech32 0.11.1",
  "bip32",
  "blake2b_simd",
  "bls12_381",
@@ -1905,7 +1911,7 @@ name = "zewif-zcashd"
 version = "0.1.0"
 dependencies = [
  "bc-rand",
- "bech32",
+ "bech32 0.12.0",
  "bitflags",
  "bridgetree",
  "bs58",
@@ -1936,7 +1942,7 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b64bf5186a8916f7a48f2a98ef599bf9c099e2458b36b819e393db1c0e768c4b"
 dependencies = [
- "bech32",
+ "bech32 0.11.1",
  "blake2b_simd",
  "memuse",
  "subtle",
