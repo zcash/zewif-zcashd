@@ -35,8 +35,5 @@ bridgetree = "0.7"
 bs58 = { version = "0.5.1", features = ["check"] }
 bech32 = "0.12"
 
-[dev-dependencies]
-bc-rand = "^0.4.0"
-
 [patch.crates-io]
 zewif = { git = "https://github.com/zcash/zewif.git", branch = "main" }
