@@ -431,9 +431,13 @@ impl<'a> ZcashdParser<'a> {
         Ok(parse!(buf = value, PubKey, "defaultkey")?)
     }
 
-    fn parse_mnemonic_hd_chain(&self) -> Result<MnemonicHDChain, Error> {
+    fn parse_mnemonic_hd_chain(&self) -> Result<Option<MnemonicHDChain>, Error> {
+        // Absent in wallets predating zcashd's v4.7.0 mnemonic support.
+        if !self.dump.has_value_for_keyname("mnemonichdchain") {
+            return Ok(None);
+        }
         let value = self.value_for_keyname("mnemonichdchain")?;
-        Ok(parse!(buf = value, MnemonicHDChain, "mnemonichdchain")?)
+        Ok(Some(parse!(buf = value, MnemonicHDChain, "mnemonichdchain")?))
     }
 
     fn parse_send_recipients(&self) -> Result<HashMap<TxId, Vec<RecipientMapping>>, Error> {
@@ -540,7 +544,11 @@ impl<'a> ZcashdParser<'a> {
         })
     }
 
-    fn parse_mnemonic_phrase(&self) -> Result<Bip39Mnemonic, Error> {
+    fn parse_mnemonic_phrase(&self) -> Result<Option<Bip39Mnemonic>, Error> {
+        // Absent in wallets predating zcashd's v4.7.0 mnemonic support.
+        if !self.dump.has_keys_for_keyname("mnemonicphrase") {
+            return Ok(None);
+        }
         let (key, value) = self
             .dump
             .record_for_keyname("mnemonicphrase")?;
@@ -550,7 +558,7 @@ impl<'a> ZcashdParser<'a> {
         let _fingerprint = parse!(buf = &key.data, SeedFingerprint, "seed fingerprint")?;
         let bip39_mnemonic = parse!(buf = &value, Bip39Mnemonic, "mnemonic phrase")?;
         self.mark_key_parsed(&key);
-        Ok(bip39_mnemonic)
+        Ok(Some(bip39_mnemonic))
     }
 
     fn parse_address_names(&self) -> Result<HashMap<Address, String>, Error> {
