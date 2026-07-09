@@ -57,8 +57,8 @@ pub struct ZcashdWallet {
     keys: Keys,
     min_version: ClientVersion,
     legacy_hd_seed: Option<LegacySeed>,
-    mnemonic_hd_chain: MnemonicHDChain,
-    bip39_mnemonic: Bip39Mnemonic,
+    mnemonic_hd_chain: Option<MnemonicHDChain>,
+    bip39_mnemonic: Option<Bip39Mnemonic>,
     network_info: NetworkInfo,
     orchard_note_commitment_tree: OrchardNoteCommitmentTree,
     orderposnext: Option<i64>,
@@ -89,8 +89,8 @@ impl ZcashdWallet {
         keys: Keys,
         min_version: ClientVersion,
         legacy_hd_seed: Option<LegacySeed>,
-        mnemonic_hd_chain: MnemonicHDChain,
-        bip39_mnemonic: Bip39Mnemonic,
+        mnemonic_hd_chain: Option<MnemonicHDChain>,
+        bip39_mnemonic: Option<Bip39Mnemonic>,
         network_info: NetworkInfo,
         orchard_note_commitment_tree: OrchardNoteCommitmentTree,
         orderposnext: Option<i64>,
@@ -184,12 +184,16 @@ impl ZcashdWallet {
         self.legacy_hd_seed.as_ref()
     }
 
-    pub fn mnemonic_hd_chain(&self) -> &MnemonicHDChain {
-        &self.mnemonic_hd_chain
+    /// The mnemonic HD chain metadata, present only for wallets created or
+    /// upgraded by zcashd v4.7.0 or later.
+    pub fn mnemonic_hd_chain(&self) -> Option<&MnemonicHDChain> {
+        self.mnemonic_hd_chain.as_ref()
     }
 
-    pub fn bip39_mnemonic(&self) -> &Bip39Mnemonic {
-        &self.bip39_mnemonic
+    /// The wallet's BIP-39 mnemonic, present only for wallets created or
+    /// upgraded by zcashd v4.7.0 or later.
+    pub fn bip39_mnemonic(&self) -> Option<&Bip39Mnemonic> {
+        self.bip39_mnemonic.as_ref()
     }
 
     pub fn network_info(&self) -> &NetworkInfo {
