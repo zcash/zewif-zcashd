@@ -24,7 +24,7 @@ zcash_address = "0.12"
 zcash_encoding = "0.4"
 zcash_keys = { version = "0.14", features = ["transparent-inputs", "sapling", "orchard", "zcashd-compat"] }
 zcash_primitives = "0.28"
-zcash_protocol = "0.9"
+zcash_protocol = { version = "0.9", features = ["local-consensus"] }
 zcash_transparent = { version = "0.8", features = ["transparent-inputs"] }
 secp256k1 = "0.29"
 secrecy = "0.8"
@@ -35,6 +35,11 @@ incrementalmerkletree = "0.8"
 bridgetree = "0.7"
 bs58 = { version = "0.5.1", features = ["check"] }
 bech32 = "0.12"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+  'cfg(zcash_unstable, values("nu7"))',
+] }
 
 [patch.crates-io]
 zewif = { git = "https://github.com/zcash/zewif.git", branch = "main" }

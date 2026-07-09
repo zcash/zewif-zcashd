@@ -10,5 +10,5 @@ mod_use!(zcashd_parser);
 pub mod migrate;
 pub mod parser;
 pub mod zcashd_wallet;
-pub use migrate::migrate_to_zewif;
+pub use migrate::{RegtestActivations, migrate_to_zewif};
 pub use zcashd_wallet::ZcashdWallet;
