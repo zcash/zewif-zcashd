@@ -56,7 +56,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let export_height = BlockHeight::from_u32(2_400_000);
 
     println!("\n=== ZeWIF migration ===");
-    let zewif = migrate_to_zewif(&wallet, export_height)?;
+    // A regtest wallet would pass `Some(RegtestActivations::Local(..))` here to
+    // record its activation schedule; mainnet/testnet exports pass `None`.
+    let zewif = migrate_to_zewif(&wallet, export_height, None)?;
     for w in zewif.wallets() {
         println!("accounts:      {}", w.accounts().len());
         println!("address book:  {}", w.address_book().len());
