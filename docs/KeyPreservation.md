@@ -1,91 +1,95 @@
-# ZCash Key Preservation Strategy
+# Key Preservation Strategy
 
-This document outlines how cryptographic keys are handled during wallet migration with the ZeWIF format.
+This document describes what cryptographic material `zewif-zcashd` preserves
+when migrating a `zcashd` `wallet.dat` into the ZeWIF format, and why some
+derivable material is deliberately left out. The guiding principle is
+**preserve what the source wallet actually holds** — enough to reconstruct
+spending and viewing capability — rather than re-deriving or recomputing data
+that a ZeWIF-aware importer can recover on its own.
 
-## Key Types in ZCash
+The relevant code lives in `src/migrate/secrets.rs` (spending material),
+`src/migrate/accounts.rs` and `src/migrate/addresses.rs` (viewing material and
+addresses), and `src/migrate/received_outputs.rs` (note commitment positions).
 
-ZCash uses several different types of cryptographic keys for various purposes:
+> **Encrypted wallets are not yet supported.** Everything below assumes an
+> unencrypted `wallet.dat`. When a `zcashd` wallet is passphrase-encrypted, its
+> spending keys and mnemonic live in encrypted records (`ckey`, `csapzkey`,
+> `czkey`, `cmnemonicphrase`) guarded by a master key (`mkey`), none of which
+> this crate reads — so no spending material is recovered, and the wallet in
+> fact fails to parse today (the plaintext `key` record is absent). Decrypt the
+> wallet with `zcashd` first. Tracked in
+> [issue #8](https://github.com/zcash/zewif-zcashd/issues/8).
 
-### Spending Keys
+## Spending material: the secret store
 
-Spending keys enable the creation of shielded transactions and authorize spending from shielded addresses. These include:
+All spending authority the wallet exposes is collected into the ZeWIF document's
+secret store (`build_secret_store`). If the wallet holds no spending material at
+all, no secret store is emitted and the export is **viewing-only**.
 
-- **Extended Spending Keys**: Full keys that grant complete spending authority
-- **Raw Spending Keys**: The core cryptographic material needed for spending
+The secret store carries:
 
-During migration, spending keys are preserved exactly as they exist in the source wallet to maintain spending capability.
+- **Seeds.** A v4.7.0+ wallet records its BIP-39 mnemonic directly; it is stored
+  keyed by its ZIP-32 seed fingerprint. A pre-mnemonic (pre-v4.7.0) wallet that
+  carries a legacy HD seed has a mnemonic **re-derived** from that seed exactly
+  as `zcashd`'s own wallet upgrade would (`zcash_keys::keys::zcashd::derive_mnemonic`),
+  so its legacy account imports as a seed-derived account rather than a bag of
+  loose keys. The raw legacy seed is additionally retained, because legacy
+  Sapling keys were derived from it under the pre-v4.7.0 scheme.
+- **Transparent private keys**, keyed by public key, drawn from both the legacy
+  `key`/`keys` records and the encrypted-comment `wkey` records. Each is emitted
+  in canonical WIF Base58Check encoding (compressed form when the public key is
+  compressed).
+- **Sapling extended spending keys**, keyed by their extended full viewing key
+  encoding (169-byte ZIP-32 form).
+- **Sprout spending keys**, keyed by their `zc`-prefixed payment address and
+  emitted in canonical Base58Check (`SK…`/`ST…`) encoding.
 
-### Viewing Keys
+Spending keys are preserved as-is; they are never regenerated, so spending
+capability is carried over exactly.
 
-ZCash has a hierarchy of viewing keys with different capabilities:
+## Viewing material
 
-- **Full Viewing Keys (FVKs)**: Allow viewing all transaction details (incoming and outgoing)
-- **Incoming Viewing Keys (IVKs)**: Allow detection of incoming transactions only
-- **Diversified Payment Addresses**: Multiple addresses can be derived from a single IVK
+Viewing capability is preserved at the level of accounts and addresses rather
+than as a separate per-address key registry:
 
-## Migration Strategy
+- **Unified accounts** each carry their **unified full viewing key (UFVK)** as
+  the account's viewing key (`AccountViewingKey::Ufvk`). This is the full
+  viewing capability for the account's Orchard, Sapling, and transparent
+  receivers.
+- The **synthesized legacy account** (see
+  [TransactionAssignment.md](TransactionAssignment.md)) is keyed as a
+  transparent address set and carries every legacy transparent, Sapling, and
+  Sprout address the wallet knows. Each Sapling and Sprout address carries its
+  protocol address; the corresponding spending key (from which the incoming and
+  full viewing keys are derivable) lives in the secret store.
+- **View-only imported Sapling keys** (extended FVKs imported with
+  `addDefaultAddress=false`, which have no companion `sapzaddr` record) are
+  recovered by computing their canonical default address, so the address is not
+  lost even when no spending key is present.
 
-Our migration strategy focuses on **data preservation** rather than recreating wallet functionality:
+## What is deliberately not stored
 
-### What We Preserve
+Some data is omitted because a ZeWIF importer can recover it from what is
+preserved plus chain access:
 
-1. **Spending Keys**: All spending keys are preserved exactly as they exist in the source wallet
-2. **Incoming Viewing Keys (IVKs)**: All IVKs are preserved exactly as they exist in the source wallet
-3. **Address-to-Key Relationships**: The connection between addresses and their keys is maintained
+- **Full viewing keys as separate records.** For unified accounts the UFVK is
+  already the full viewing key; for shielded addresses the FVK is derivable from
+  the spending key held in the secret store. Storing FVKs separately would
+  duplicate derivable data.
+- **Full incremental witnesses.** Only the **note commitment tree position** of
+  each received note is recorded (`CommitmentTreeData::Position`), not a
+  reconstructed witness. `zcashd`'s parsed witness snapshot exposes only raw
+  tree nodes with no path or root derivation, so rebuilding a spec-conformant
+  witness would mean reimplementing the Sapling/Orchard Merkle hashing. A
+  position plus the account birthday is enough for an importer with chain access
+  to rebuild the witness by scanning forward.
+- **Note values, memos, and (for Orchard) nullifiers.** These are recoverable by
+  trial-decrypting the raw transaction — which the export carries — with the
+  viewing key, so they are not extracted during migration.
 
-### What We Don't Store Separately
+## Viewing-only wallets
 
-1. **Full Viewing Keys (FVKs)**: We don't separately store FVKs because:
-   - They can be derived from spending keys when needed
-   - Source wallets typically don't store FVKs separately when spending keys exist
-   - In data migration, we focus on preserving what exists rather than deriving new data
-
-## Implementation Details
-
-### IVK Preservation
-
-Incoming Viewing Keys are preserved through these steps:
-
-1. During wallet parsing, we extract IVKs associated with each shielded address
-2. Each IVK is stored as a property of its shielded address in the ZeWIF format
-3. When migrating to a different wallet format, IVKs are transferred to maintain viewing capability
-
-```rust
-// Example of how IVKs are preserved during Sapling address migration
-pub fn convert_sapling_addresses(wallet: &ZcashdWallet, /* other params */) -> Result<()> {
-    for (sapling_address, viewing_key) in wallet.sapling_z_addresses() {
-        let address_str = sapling_address.to_string(wallet.network());
-        
-        // Create a new ShieldedAddress and preserve the incoming viewing key
-        let mut shielded_address = zewif::ShieldedAddress::new(address_str.clone());
-        shielded_address.set_incoming_viewing_key(viewing_key.to_owned());
-        
-        // ... additional code to handle other properties and account assignment
-    }
-}
-```
-
-### Spending Key Preservation
-
-Spending keys follow a similar pattern:
-
-1. During wallet parsing, we extract spending keys where available
-2. Each spending key is stored with its associated address
-3. The original key format is preserved to maintain compatibility
-
-## Benefits of This Approach
-
-1. **Minimalism**: We store only what's necessary and actually present in source wallets
-2. **Accuracy**: All preserved keys match exactly what was in the source wallet
-3. **Completeness**: All necessary data for spending and viewing is maintained
-4. **Simplicity**: The implementation avoids unnecessary complexity from key derivation
-
-## Testing
-
-We validate key preservation through comprehensive tests:
-
-1. **IVK Preservation Tests**: Verify all IVKs are correctly preserved during migration
-2. **Spending Key Tests**: Ensure spending capability is maintained
-3. **Edge Case Tests**: Handle scenarios where keys may be missing
-
-These tests ensure the migration process maintains all cryptographic capabilities of the original wallet.
+A wallet that holds only viewing keys and watch-only material — no seeds and no
+spending keys — migrates to a ZeWIF document with **no secret store**. Its
+accounts, addresses, and viewing keys are preserved so the wallet can still
+track its funds, but no spending authority is (or could be) carried over.

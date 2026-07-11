@@ -939,9 +939,9 @@ checksum = "549e471b99ccaf2f89101bec68f4d244457d5a95a9c3d0672e9564124397741d"
 
 [[package]]
 name = "num-bigint"
-version = "0.4.7"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c863e9ab5e7bf9c99ba75e1050f1e4d624ae87ed3532d6238ffbdc7b585dbbe6"
+checksum = "c89e69e7e0f03bea5ef08013795c25018e101932225a656383bd384495ecc367"
 dependencies = [
  "num-integer",
  "num-traits",
@@ -1962,8 +1962,9 @@ dependencies = [
 
 [[package]]
 name = "zewif"
-version = "0.1.0"
-source = "git+https://github.com/zcash/zewif.git?branch=main#74f1a1694131386515e1733dfb9f414a6284555f"
+version = "1.0.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9b2e34873580e94185e8068040c4e4404e1fe00b906693fe041954c7fad6136"
 dependencies = [
  "hex",
  "minicbor",
@@ -1972,7 +1973,7 @@ dependencies = [
 
 [[package]]
 name = "zewif-zcashd"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "bech32 0.12.0",
  "bitflags",

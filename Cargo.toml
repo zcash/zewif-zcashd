@@ -1,12 +1,15 @@
 [package]
 name = "zewif-zcashd"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
+description = "Exporter that transcodes between the historic zcashd wallet.dat format and the Zcash Wallet Interchange Format"
+homepage = "https://github.com/zcash/zewif-zcashd"
+repository = "https://github.com/zcash/zewif-zcashd"
 
 [dependencies]
-zewif = "0.1.0"
+zewif = "1.0.0-rc.1"
 bitflags = "2"
 thiserror = "2"
 chrono = "0.4.39"
@@ -40,6 +43,3 @@ bech32 = "0.12"
 unexpected_cfgs = { level = "warn", check-cfg = [
   'cfg(zcash_unstable, values("nu7"))',
 ] }
-
-[patch.crates-io]
-zewif = { git = "https://github.com/zcash/zewif.git", branch = "main" }
