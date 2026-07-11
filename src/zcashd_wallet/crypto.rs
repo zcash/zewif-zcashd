@@ -105,7 +105,7 @@ pub fn decrypt_master_key(
     }
 
     let (key, iv) = bytes_to_key_sha512(&params.salt, passphrase.expose_secret(), params.derive_iterations);
-    let plaintext = aes256_cbc_decrypt(&key, &iv, &params.encrypted_key)?;
+    let plaintext = aes256_cbc_decrypt(&key, &iv[..], &params.encrypted_key)?;
 
     if plaintext.len() != KEY_SIZE {
         return Err(DecryptionError::MasterKeyLength(plaintext.len()));
@@ -142,7 +142,7 @@ fn bytes_to_key_sha512(
     salt: &[u8],
     passphrase: &[u8],
     count: u32,
-) -> (Zeroizing<[u8; KEY_SIZE]>, [u8; IV_SIZE]) {
+) -> (Zeroizing<[u8; KEY_SIZE]>, Zeroizing<[u8; IV_SIZE]>) {
     let mut buf = Zeroizing::new([0u8; 64]);
     let mut hasher = Sha512::new();
     hasher.update(passphrase);
@@ -157,7 +157,9 @@ fn bytes_to_key_sha512(
 
     let mut key = Zeroizing::new([0u8; KEY_SIZE]);
     key.copy_from_slice(&buf[..KEY_SIZE]);
-    let mut iv = [0u8; IV_SIZE];
+    // The IV is derived from the same passphrase-dependent hash as the key, so
+    // it is wiped on drop as well.
+    let mut iv = Zeroizing::new([0u8; IV_SIZE]);
     iv.copy_from_slice(&buf[KEY_SIZE..KEY_SIZE + IV_SIZE]);
     (key, iv)
 }
@@ -254,7 +256,7 @@ mod tests {
     fn kdf_matches_independent_vector() {
         let (key, iv) = bytes_to_key_sha512(&SALT, PASSPHRASE, ITERATIONS);
         assert_eq!(&key[..], &KDF_KEY[..]);
-        assert_eq!(iv, KDF_IV);
+        assert_eq!(&iv[..], &KDF_IV[..]);
     }
 
     #[test]
