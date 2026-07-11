@@ -398,6 +398,15 @@ impl<'a> ZcashdParser<'a> {
                 .try_into()
                 .map_err(|_| Error::WrongWalletPassphrase)?;
 
+            // Confirm the decrypted scalar actually derives the record's public
+            // key, so a corrupt `ckey` record is rejected rather than silently
+            // recovered as an incorrect key (mirrors zcashd's `DecryptKey` ->
+            // `CKey::VerifyPubKey`). The passphrase itself was already confirmed
+            // while deriving the master key.
+            if !derived_pubkey_matches(&scalar, &pubkey) {
+                return Err(Error::CorruptedEncryptedKey { keyname: "ckey" });
+            }
+
             let keypair = KeyPair::from_decrypted_scalar(pubkey.clone(), &scalar, metadata);
             keys_map.insert(pubkey, keypair);
 
@@ -1056,6 +1065,19 @@ impl<'a> ZcashdParser<'a> {
                 ::sapling::zip32::ExtendedSpendingKey,
                 "sapling extended spending key"
             )?;
+
+            // Confirm the decrypted spending key derives the full viewing key
+            // stored alongside it, so a corrupt `csapzkey` record is rejected
+            // rather than silently recovered (mirrors zcashd's
+            // `DecryptSaplingSpendingKey` check).
+            #[allow(deprecated)]
+            let derived_extfvk = extsk.to_extended_full_viewing_key();
+            if extfvk_bytes(&derived_extfvk) != extfvk_bytes(&extfvk) {
+                return Err(Error::CorruptedEncryptedKey {
+                    keyname: "csapzkey",
+                });
+            }
+
             let keypair = SaplingKey::new(ivk, extsk, metadata)?;
             keys_map.insert(ivk, keypair);
 
@@ -1074,17 +1096,22 @@ fn sha256d(bytes: &[u8]) -> [u8; 32] {
     out
 }
 
+/// The 169-byte ZIP-32 serialization of a Sapling extended full viewing key.
+fn extfvk_bytes(extfvk: &::sapling::zip32::ExtendedFullViewingKey) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(169);
+    extfvk
+        .write(&mut bytes)
+        .expect("writing to a Vec is infallible");
+    bytes
+}
+
 /// The ZIP-32 fingerprint of a Sapling extended full viewing key, used by
 /// `zcashd` as the AES IV source for an encrypted Sapling spending key
 /// (`SaplingFullViewingKey::GetFingerprint`). It is BLAKE2b-256 of the 96-byte
 /// full viewing key (bytes `[41..137]` of the 169-byte extended FVK
 /// serialization) personalized with `ZcashSaplingFVFP`.
 fn sapling_fvk_fingerprint(extfvk: &::sapling::zip32::ExtendedFullViewingKey) -> [u8; 32] {
-    let mut serialized = Vec::with_capacity(169);
-    extfvk
-        .write(&mut serialized)
-        .expect("writing to a Vec is infallible");
-    let fvk = &serialized[41..137];
+    let fvk = &extfvk_bytes(extfvk)[41..137];
     let hash = blake2b_simd::Params::new()
         .hash_length(32)
         .personal(b"ZcashSaplingFVFP")

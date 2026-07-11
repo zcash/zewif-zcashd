@@ -77,6 +77,12 @@ pub enum Error {
     #[error(transparent)]
     Decryption(#[from] DecryptionError),
 
+    /// A record decrypted successfully (the passphrase was confirmed against
+    /// another key) but the recovered secret does not derive the key identifier
+    /// its record is stored under, indicating a corrupt record.
+    #[error("decrypted {keyname} record is corrupt: it does not derive its stored key")]
+    CorruptedEncryptedKey { keyname: &'static str },
+
     /// The wallet contains encrypted Sprout spending keys (`czkey`), which this
     /// crate does not yet decrypt. Sprout has been deprecated since 2018 and is
     /// absent from essentially all live wallets.
