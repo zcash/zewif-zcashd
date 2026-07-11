@@ -4,11 +4,14 @@
 //!
 //! With no arguments, reads `$HOME/.zcash/wallet.dat` and writes `wallet.zewif`
 //! in the current directory.
+//!
+//! For an encrypted wallet, supply the passphrase in the
+//! `ZCASHD_WALLET_PASSPHRASE` environment variable.
 
 use std::path::PathBuf;
 
 use zewif::BlockHeight;
-use zewif_zcashd::{BDBDump, ZcashdDump, ZcashdParser, migrate_to_zewif};
+use zewif_zcashd::{BDBDump, SecretVec, ZcashdDump, ZcashdParser, migrate_to_zewif};
 
 fn default_wallet_path() -> PathBuf {
     let home = std::env::var_os("HOME")
@@ -30,9 +33,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Reading wallet: {}", path.display());
 
+    // Supply the passphrase for an encrypted wallet via the environment, so it
+    // is not captured in shell history or the process argument list.
+    let passphrase = std::env::var("ZCASHD_WALLET_PASSPHRASE")
+        .ok()
+        .map(|p| SecretVec::new(p.into_bytes()));
+
     let bdb = BDBDump::from_file(&path)?;
     let dump = ZcashdDump::from_bdb_dump(&bdb, false)?;
-    let (wallet, unparsed) = ZcashdParser::parse_dump(&dump, false)?;
+    let (wallet, unparsed) = ZcashdParser::parse_dump_with_key(&dump, false, passphrase)?;
 
     println!("\n=== Wallet summary ===");
     println!("network:            {:?}", wallet.network());

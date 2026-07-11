@@ -46,19 +46,6 @@ faithfully requires:
    re-projected into the generic ZeWIF model: accounts, addresses (transparent,
    sapling, unified), transactions, witnesses, and seed material.
 
-## Limitations
-
-> [!IMPORTANT]
-> **Encrypted wallets are not yet supported.** `zcashd` can encrypt a
-> `wallet.dat` with a passphrase, in which case the spending keys and mnemonic
-> are held in encrypted records (`ckey`, `csapzkey`, `czkey`,
-> `cmnemonicphrase`) protected by a master key (`mkey`). This crate does not
-> read those records or perform decryption, so an **encrypted `wallet.dat`
-> currently fails to parse** (with a `KeynameNotFound` error for the absent
-> plaintext `key` record). Decrypt the wallet with `zcashd` first, or follow
-> [issue #8](https://github.com/zcash/zewif-zcashd/issues/8) for encrypted-wallet
-> support.
-
 ## Usage
 
 See [`examples/read_wallet.rs`](examples/read_wallet.rs) for a runnable example
@@ -72,6 +59,21 @@ cargo run --example read_wallet -- /path/to/wallet.dat [out.zewif]
 
 With no arguments it reads `$HOME/.zcash/wallet.dat` and writes `wallet.zewif`
 in the current directory.
+
+### Encrypted wallets
+
+A passphrase-encrypted `wallet.dat` stores its spending keys and seeds in
+encrypted records. Supply the passphrase to recover them: with the API, call
+`ZcashdParser::parse_dump_with_key` with a `SecretVec` passphrase (plain
+`parse_dump` treats the wallet as unencrypted and fails if it is not); with the
+example, set the `ZCASHD_WALLET_PASSPHRASE` environment variable:
+
+```sh
+ZCASHD_WALLET_PASSPHRASE='…' cargo run --example read_wallet -- /path/to/wallet.dat
+```
+
+A wrong passphrase is reported as an error rather than producing incorrect keys.
+Encrypted Sprout spending keys are not yet supported.
 
 ## Layout
 
