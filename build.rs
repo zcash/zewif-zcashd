@@ -1,8 +1,8 @@
 use std::{env, fs, path::Path, process::Command};
 
-const BDB_TARBALL: &str = "vendor/db-6.2.23.tar.gz";
+const BDB_TARBALL: &str = "vendor/db-6.2.23-stripped.tar.gz";
 const BDB_DIR_NAME: &str = "db-6.2.23";
-const BDB_SHA256: &str = "47612c8991aa9ac2f6be721267c8d3cdccf5ac83105df8e50809daea24e95dc7";
+const BDB_SHA256: &str = "1a68ef6361f045adc66c9b69d4b28faa50f0ead0e2f6e64a95322610f094ef1b";
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
