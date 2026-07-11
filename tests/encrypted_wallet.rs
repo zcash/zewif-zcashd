@@ -59,8 +59,28 @@ fn parse_plaintext() -> ZcashdWallet {
         .0
 }
 
+/// These tests shell out to `db_dump`, which `build.rs` only vendors on
+/// non-Windows platforms (elsewhere it must be on `PATH`). Where it is
+/// unavailable — notably Windows CI — reading a fixture fails with a
+/// `DbDumpExec` error; detect that and skip rather than fail.
+fn db_dump_available() -> bool {
+    BDBDump::from_file(&fixture("encrypted-regtest-wallet.dat")).is_ok()
+}
+
+/// Skip the current test (returning as a pass) when `db_dump` is unavailable.
+macro_rules! require_db_dump {
+    () => {
+        if !db_dump_available() {
+            eprintln!("skipping: db_dump is unavailable on this platform");
+            return;
+        }
+    };
+}
+
 #[test]
 fn decrypts_transparent_key_to_ground_truth() {
+    require_db_dump!();
+
     let wallet =
         parse_encrypted(decrypt_with(PASSPHRASE)).expect("decrypts with correct passphrase");
 
@@ -81,6 +101,8 @@ fn decrypts_transparent_key_to_ground_truth() {
 
 #[test]
 fn decrypts_sapling_key_to_ground_truth() {
+    require_db_dump!();
+
     let wallet =
         parse_encrypted(decrypt_with(PASSPHRASE)).expect("decrypts with correct passphrase");
 
@@ -101,6 +123,8 @@ fn decrypts_sapling_key_to_ground_truth() {
 /// address, and transaction at once, not just the two spot-checked above.
 #[test]
 fn encrypted_export_matches_plaintext_export() {
+    require_db_dump!();
+
     let height = BlockHeight::from_u32(2_000_000);
 
     let plaintext = migrate_to_zewif(&parse_plaintext(), height, None)
@@ -124,6 +148,8 @@ fn encrypted_export_matches_plaintext_export() {
 
 #[test]
 fn recovers_all_transparent_keys() {
+    require_db_dump!();
+
     let wallet = parse_encrypted(decrypt_with(PASSPHRASE)).expect("decrypts");
     // The plaintext and encrypted wallets carry the same key set.
     assert_eq!(
@@ -134,6 +160,8 @@ fn recovers_all_transparent_keys() {
 
 #[test]
 fn wrong_passphrase_is_rejected() {
+    require_db_dump!();
+
     match parse_encrypted(decrypt_with("the wrong passphrase")) {
         Err(Error::WrongWalletPassphrase) => {}
         other => panic!("expected WrongWalletPassphrase, got {other:?}"),
@@ -143,6 +171,8 @@ fn wrong_passphrase_is_rejected() {
 /// Reject mode (the default): an encrypted wallet is an error.
 #[test]
 fn reject_mode_reports_an_encrypted_wallet() {
+    require_db_dump!();
+
     match parse_encrypted(EncryptedKeyPolicy::Reject) {
         Err(Error::EncryptedWalletRequiresPassphrase) => {}
         other => panic!("expected EncryptedWalletRequiresPassphrase, got {other:?}"),
@@ -154,6 +184,8 @@ fn reject_mode_reports_an_encrypted_wallet() {
 /// encrypted key sets empty (in contrast to decrypt mode, which recovers them).
 #[test]
 fn skip_mode_omits_encrypted_keys() {
+    require_db_dump!();
+
     let wallet =
         parse_encrypted(EncryptedKeyPolicy::Skip).expect("skip mode succeeds without a passphrase");
 
@@ -175,6 +207,8 @@ fn skip_mode_omits_encrypted_keys() {
 
 #[test]
 fn migrates_with_a_populated_secret_store() {
+    require_db_dump!();
+
     let wallet = parse_encrypted(decrypt_with(PASSPHRASE)).expect("decrypts");
     let zewif = migrate_to_zewif(&wallet, BlockHeight::from_u32(1), None).expect("migrates");
 
