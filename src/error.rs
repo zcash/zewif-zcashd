@@ -83,6 +83,13 @@ pub enum Error {
     #[error("decrypted {keyname} record is corrupt: it does not derive its stored key")]
     CorruptedEncryptedKey { keyname: &'static str },
 
+    /// A wallet contains both the plaintext and the encrypted variant of the
+    /// same key type (e.g. both `key` and `ckey`). zcashd erases the plaintext
+    /// records when encrypting, so their coexistence indicates a corrupt or
+    /// hand-modified wallet; refuse rather than silently ignore one set.
+    #[error("wallet contains both plaintext {keyname:?} and encrypted c{keyname} records")]
+    InconsistentKeyEncryption { keyname: &'static str },
+
     /// The wallet contains encrypted Sprout spending keys (`czkey`), which this
     /// crate does not yet decrypt. Sprout has been deprecated since 2018 and is
     /// absent from essentially all live wallets.

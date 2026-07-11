@@ -334,6 +334,13 @@ impl<'a> ZcashdParser<'a> {
     }
 
     fn parse_keys(&self, master_key: Option<&[u8; 32]>) -> Result<Keys, Error> {
+        // Plaintext `key` and encrypted `ckey` records are mutually exclusive:
+        // zcashd erases the plaintext record when it writes the encrypted one
+        // (`CWalletDB::WriteCryptedKey`). Refuse a wallet that somehow has both,
+        // rather than silently parsing only the plaintext set.
+        if self.dump.has_keys_for_keyname("key") && self.dump.has_keys_for_keyname("ckey") {
+            return Err(Error::InconsistentKeyEncryption { keyname: "key" });
+        }
         // An encrypted wallet stores its transparent keys as `ckey` records
         // (pubkey -> encrypted scalar) instead of plaintext `key` records; the
         // per-key `keymeta` is retained unencrypted in both cases.
@@ -449,6 +456,11 @@ impl<'a> ZcashdParser<'a> {
     }
 
     fn parse_sapling_keys(&self, master_key: Option<&[u8; 32]>) -> Result<SaplingKeys, Error> {
+        // Plaintext and encrypted Sapling keys are mutually exclusive (see
+        // `parse_keys`); refuse a wallet that has both.
+        if self.dump.has_keys_for_keyname("sapzkey") && self.dump.has_keys_for_keyname("csapzkey") {
+            return Err(Error::InconsistentKeyEncryption { keyname: "sapzkey" });
+        }
         let mut keys_map = HashMap::new();
         if !self.dump.has_keys_for_keyname("sapzkey") {
             // An encrypted wallet stores its Sapling spending keys as
@@ -539,6 +551,11 @@ impl<'a> ZcashdParser<'a> {
     }
 
     fn parse_sprout_keys(&self, _master_key: Option<&[u8; 32]>) -> Result<Option<SproutKeys>, Error> {
+        // Plaintext and encrypted Sprout keys are mutually exclusive (see
+        // `parse_keys`); refuse a wallet that has both.
+        if self.dump.has_keys_for_keyname("zkey") && self.dump.has_keys_for_keyname("czkey") {
+            return Err(Error::InconsistentKeyEncryption { keyname: "zkey" });
+        }
         if !self.dump.has_keys_for_keyname("zkey") {
             // Encrypted Sprout spending keys (`czkey`) are not decrypted even
             // when a passphrase is supplied: Sprout has been deprecated since
