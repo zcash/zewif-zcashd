@@ -11,14 +11,14 @@ The relevant code lives in `src/migrate/secrets.rs` (spending material),
 `src/migrate/accounts.rs` and `src/migrate/addresses.rs` (viewing material and
 addresses), and `src/migrate/received_outputs.rs` (note commitment positions).
 
-> **Encrypted wallets are not yet supported.** Everything below assumes an
-> unencrypted `wallet.dat`. When a `zcashd` wallet is passphrase-encrypted, its
+> **Encrypted wallets.** When a `zcashd` wallet is passphrase-encrypted, its
 > spending keys and mnemonic live in encrypted records (`ckey`, `csapzkey`,
-> `czkey`, `cmnemonicphrase`) guarded by a master key (`mkey`), none of which
-> this crate reads — so no spending material is recovered, and the wallet in
-> fact fails to parse today (the plaintext `key` record is absent). Decrypt the
-> wallet with `zcashd` first. Tracked in
-> [issue #8](https://github.com/zcash/zewif-zcashd/issues/8).
+> `cmnemonicphrase`, `chdseed`) guarded by a master key (`mkey`). Given the
+> passphrase, this crate recovers the master key and decrypts those records
+> back into the same material described below, so the preservation strategy is
+> identical; see the "Encrypted wallets" section of the README and
+> `src/zcashd_wallet/crypto.rs`. Encrypted **Sprout** spending keys (`czkey`)
+> are the one exception — they are not yet decrypted.
 
 ## Spending material: the secret store
 

@@ -46,19 +46,6 @@ faithfully requires:
    re-projected into the generic ZeWIF model: accounts, addresses (transparent,
    sapling, unified), transactions, witnesses, and seed material.
 
-## Limitations
-
-> [!IMPORTANT]
-> **Encrypted wallets are not yet supported.** `zcashd` can encrypt a
-> `wallet.dat` with a passphrase, in which case the spending keys and mnemonic
-> are held in encrypted records (`ckey`, `csapzkey`, `czkey`,
-> `cmnemonicphrase`) protected by a master key (`mkey`). This crate does not
-> read those records or perform decryption, so an **encrypted `wallet.dat`
-> currently fails to parse** (with a `KeynameNotFound` error for the absent
-> plaintext `key` record). Decrypt the wallet with `zcashd` first, or follow
-> [issue #8](https://github.com/zcash/zewif-zcashd/issues/8) for encrypted-wallet
-> support.
-
 ## Usage
 
 See [`examples/read_wallet.rs`](examples/read_wallet.rs) for a runnable example
@@ -72,6 +59,32 @@ cargo run --example read_wallet -- /path/to/wallet.dat [out.zewif]
 
 With no arguments it reads `$HOME/.zcash/wallet.dat` and writes `wallet.zewif`
 in the current directory.
+
+### Encrypted wallets
+
+A passphrase-encrypted `wallet.dat` stores its spending keys and seeds in
+encrypted records. `ZcashdParser::parse_dump_with_policy` takes an
+[`EncryptedKeyPolicy`] with three modes:
+
+- **`Reject`** (the default, also `parse_dump`) — treat the wallet as
+  unencrypted and fail if any encrypted key material is present.
+- **`Decrypt(passphrase)`** — decrypt the encrypted keys with the given
+  `SecretVec` passphrase, failing if decryption does not succeed. A wrong
+  passphrase is reported as an error rather than producing incorrect keys.
+- **`Skip`** — for a lost passphrase: skip the encrypted keys and migrate only
+  the plaintext records (viewing keys, addresses, transactions, and any
+  plaintext seeds).
+
+The `read_wallet` example selects the mode from the environment — set
+`ZCASHD_WALLET_PASSPHRASE` to decrypt, or `ZCASHD_WALLET_SKIP_ENCRYPTED` to
+skip:
+
+```sh
+ZCASHD_WALLET_PASSPHRASE='…' cargo run --example read_wallet -- /path/to/wallet.dat
+```
+
+Encrypted Sprout spending keys are not decrypted; in `Decrypt` mode a wallet
+containing them is rejected, and in `Skip` mode they are omitted.
 
 ## Layout
 

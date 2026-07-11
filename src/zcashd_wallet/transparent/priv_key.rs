@@ -26,6 +26,12 @@ impl PrivKey {
         self.hash
     }
 
+    /// Constructs a `PrivKey` directly from its stored DER blob and checksum,
+    /// for reconstructing a key recovered from an encrypted `ckey` record.
+    pub(crate) fn from_raw(data: Data, hash: u256) -> Self {
+        Self { data, hash }
+    }
+
     /// Extracts the 32-byte secp256k1 scalar from the SEC1 `EC PRIVATE KEY`
     /// DER blob stored by `zcashd`.
     ///

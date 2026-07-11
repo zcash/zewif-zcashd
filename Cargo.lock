@@ -193,6 +193,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "block-padding"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8894febbff9f758034a5b8e12d87918f56dfc64a8e1fe757d65e29041538d93"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
 name = "bls12_381"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -816,6 +825,7 @@ version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879f10e63c20629ecabbb64a8010319738c66a5cd0c29b02d63d272b03751d01"
 dependencies = [
+ "block-padding",
  "generic-array",
 ]
 
@@ -1975,11 +1985,14 @@ dependencies = [
 name = "zewif-zcashd"
 version = "0.1.0-rc.1"
 dependencies = [
+ "aes",
  "bech32 0.12.0",
  "bitflags",
+ "blake2b_simd",
  "bridgetree",
  "bs58",
  "byteorder",
+ "cbc",
  "chrono",
  "hex",
  "incrementalmerkletree",
@@ -1997,6 +2010,7 @@ dependencies = [
  "zcash_primitives",
  "zcash_protocol",
  "zcash_transparent",
+ "zeroize",
  "zewif",
  "zip32",
 ]
