@@ -4,6 +4,7 @@ mod_use!(address);
 mod_use!(block_locator);
 mod_use!(client_version);
 mod_use!(compact_size);
+mod_use!(crypto);
 mod_use!(key_metadata);
 mod_use!(incremental_merkle_tree);
 mod_use!(incremental_witness);
