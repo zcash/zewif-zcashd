@@ -63,17 +63,28 @@ in the current directory.
 ### Encrypted wallets
 
 A passphrase-encrypted `wallet.dat` stores its spending keys and seeds in
-encrypted records. Supply the passphrase to recover them: with the API, call
-`ZcashdParser::parse_dump_with_key` with a `SecretVec` passphrase (plain
-`parse_dump` treats the wallet as unencrypted and fails if it is not); with the
-example, set the `ZCASHD_WALLET_PASSPHRASE` environment variable:
+encrypted records. `ZcashdParser::parse_dump_with_policy` takes an
+[`EncryptedKeyPolicy`] with three modes:
+
+- **`Reject`** (the default, also `parse_dump`) — treat the wallet as
+  unencrypted and fail if any encrypted key material is present.
+- **`Decrypt(passphrase)`** — decrypt the encrypted keys with the given
+  `SecretVec` passphrase, failing if decryption does not succeed. A wrong
+  passphrase is reported as an error rather than producing incorrect keys.
+- **`Skip`** — for a lost passphrase: skip the encrypted keys and migrate only
+  the plaintext records (viewing keys, addresses, transactions, and any
+  plaintext seeds).
+
+The `read_wallet` example selects the mode from the environment — set
+`ZCASHD_WALLET_PASSPHRASE` to decrypt, or `ZCASHD_WALLET_SKIP_ENCRYPTED` to
+skip:
 
 ```sh
 ZCASHD_WALLET_PASSPHRASE='…' cargo run --example read_wallet -- /path/to/wallet.dat
 ```
 
-A wrong passphrase is reported as an error rather than producing incorrect keys.
-Encrypted Sprout spending keys are not yet supported.
+Encrypted Sprout spending keys are not decrypted; in `Decrypt` mode a wallet
+containing them is rejected, and in `Skip` mode they are omitted.
 
 ## Layout
 

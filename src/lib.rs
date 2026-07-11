@@ -13,7 +13,7 @@ pub mod zcashd_wallet;
 pub use migrate::{RegtestActivations, migrate_to_zewif};
 pub use zcashd_wallet::ZcashdWallet;
 
-/// Re-exported so callers can supply a wallet passphrase to
-/// [`ZcashdParser::parse_dump_with_key`] without depending on `secrecy`
-/// directly.
+/// Re-exported so callers can build an [`EncryptedKeyPolicy::Decrypt`]
+/// passphrase for [`ZcashdParser::parse_dump_with_policy`] without depending on
+/// `secrecy` directly.
 pub use secrecy::SecretVec;

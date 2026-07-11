@@ -17,7 +17,8 @@ use std::path::PathBuf;
 
 use zewif::BlockHeight;
 use zewif_zcashd::{
-    BDBDump, Error, SecretVec, ZcashdDump, ZcashdParser, ZcashdWallet, migrate_to_zewif,
+    BDBDump, EncryptedKeyPolicy, Error, SecretVec, ZcashdDump, ZcashdParser, ZcashdWallet,
+    migrate_to_zewif,
 };
 
 const PASSPHRASE: &str = "test-passphrase-42";
@@ -41,11 +42,15 @@ fn dump(name: &str) -> ZcashdDump {
     ZcashdDump::from_bdb_dump(&bdb, false).expect("collect records")
 }
 
-/// Parse the encrypted fixture, optionally with a passphrase.
-fn parse_encrypted(passphrase: Option<&str>) -> Result<ZcashdWallet, Error> {
-    let key = passphrase.map(|p| SecretVec::new(p.as_bytes().to_vec()));
-    ZcashdParser::parse_dump_with_key(&dump("encrypted-regtest-wallet.dat"), false, key)
+/// Parse the encrypted fixture under the given policy.
+fn parse_encrypted(policy: EncryptedKeyPolicy) -> Result<ZcashdWallet, Error> {
+    ZcashdParser::parse_dump_with_policy(&dump("encrypted-regtest-wallet.dat"), false, policy)
         .map(|(wallet, _)| wallet)
+}
+
+/// A `Decrypt` policy for the given passphrase.
+fn decrypt_with(passphrase: &str) -> EncryptedKeyPolicy {
+    EncryptedKeyPolicy::Decrypt(SecretVec::new(passphrase.as_bytes().to_vec()))
 }
 
 fn parse_plaintext() -> ZcashdWallet {
@@ -56,7 +61,8 @@ fn parse_plaintext() -> ZcashdWallet {
 
 #[test]
 fn decrypts_transparent_key_to_ground_truth() {
-    let wallet = parse_encrypted(Some(PASSPHRASE)).expect("decrypts with correct passphrase");
+    let wallet =
+        parse_encrypted(decrypt_with(PASSPHRASE)).expect("decrypts with correct passphrase");
 
     let target = hex::decode(T_PUBKEY_HEX).unwrap();
     let keypair = wallet
@@ -75,7 +81,8 @@ fn decrypts_transparent_key_to_ground_truth() {
 
 #[test]
 fn decrypts_sapling_key_to_ground_truth() {
-    let wallet = parse_encrypted(Some(PASSPHRASE)).expect("decrypts with correct passphrase");
+    let wallet =
+        parse_encrypted(decrypt_with(PASSPHRASE)).expect("decrypts with correct passphrase");
 
     let sapling_keys: Vec<_> = wallet.sapling_keys().keypairs().collect();
     assert_eq!(sapling_keys.len(), 1, "one legacy Sapling key");
@@ -101,7 +108,7 @@ fn encrypted_export_matches_plaintext_export() {
         .to_bytes()
         .expect("serialize plaintext export");
     let decrypted = migrate_to_zewif(
-        &parse_encrypted(Some(PASSPHRASE)).expect("decrypts"),
+        &parse_encrypted(decrypt_with(PASSPHRASE)).expect("decrypts"),
         height,
         None,
     )
@@ -117,7 +124,7 @@ fn encrypted_export_matches_plaintext_export() {
 
 #[test]
 fn recovers_all_transparent_keys() {
-    let wallet = parse_encrypted(Some(PASSPHRASE)).expect("decrypts");
+    let wallet = parse_encrypted(decrypt_with(PASSPHRASE)).expect("decrypts");
     // The plaintext and encrypted wallets carry the same key set.
     assert_eq!(
         wallet.keys().keypairs().count(),
@@ -127,23 +134,48 @@ fn recovers_all_transparent_keys() {
 
 #[test]
 fn wrong_passphrase_is_rejected() {
-    match parse_encrypted(Some("the wrong passphrase")) {
+    match parse_encrypted(decrypt_with("the wrong passphrase")) {
         Err(Error::WrongWalletPassphrase) => {}
         other => panic!("expected WrongWalletPassphrase, got {other:?}"),
     }
 }
 
+/// Reject mode (the default): an encrypted wallet is an error.
 #[test]
-fn missing_passphrase_is_reported() {
-    match parse_encrypted(None) {
+fn reject_mode_reports_an_encrypted_wallet() {
+    match parse_encrypted(EncryptedKeyPolicy::Reject) {
         Err(Error::EncryptedWalletRequiresPassphrase) => {}
         other => panic!("expected EncryptedWalletRequiresPassphrase, got {other:?}"),
     }
 }
 
+/// Skip mode: no passphrase, so the encrypted spending keys are omitted and
+/// only the plaintext records are migrated. Parsing must succeed with the
+/// encrypted key sets empty (in contrast to decrypt mode, which recovers them).
+#[test]
+fn skip_mode_omits_encrypted_keys() {
+    let wallet =
+        parse_encrypted(EncryptedKeyPolicy::Skip).expect("skip mode succeeds without a passphrase");
+
+    assert_eq!(
+        wallet.keys().keypairs().count(),
+        0,
+        "encrypted transparent keys are skipped"
+    );
+    assert_eq!(
+        wallet.sapling_keys().keypairs().count(),
+        0,
+        "the encrypted Sapling key is skipped"
+    );
+
+    // Migration still succeeds on the plaintext remainder.
+    migrate_to_zewif(&wallet, BlockHeight::from_u32(1), None)
+        .expect("migrates the plaintext remainder");
+}
+
 #[test]
 fn migrates_with_a_populated_secret_store() {
-    let wallet = parse_encrypted(Some(PASSPHRASE)).expect("decrypts");
+    let wallet = parse_encrypted(decrypt_with(PASSPHRASE)).expect("decrypts");
     let zewif = migrate_to_zewif(&wallet, BlockHeight::from_u32(1), None).expect("migrates");
 
     let secrets = zewif

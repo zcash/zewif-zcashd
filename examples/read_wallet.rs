@@ -6,12 +6,16 @@
 //! in the current directory.
 //!
 //! For an encrypted wallet, supply the passphrase in the
-//! `ZCASHD_WALLET_PASSPHRASE` environment variable.
+//! `ZCASHD_WALLET_PASSPHRASE` environment variable. To migrate only the
+//! plaintext records of an encrypted wallet whose passphrase is lost, set
+//! `ZCASHD_WALLET_SKIP_ENCRYPTED` instead.
 
 use std::path::PathBuf;
 
 use zewif::BlockHeight;
-use zewif_zcashd::{BDBDump, SecretVec, ZcashdDump, ZcashdParser, migrate_to_zewif};
+use zewif_zcashd::{
+    BDBDump, EncryptedKeyPolicy, SecretVec, ZcashdDump, ZcashdParser, migrate_to_zewif,
+};
 
 fn default_wallet_path() -> PathBuf {
     let home = std::env::var_os("HOME")
@@ -33,15 +37,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Reading wallet: {}", path.display());
 
-    // Supply the passphrase for an encrypted wallet via the environment, so it
-    // is not captured in shell history or the process argument list.
-    let passphrase = std::env::var("ZCASHD_WALLET_PASSPHRASE")
-        .ok()
-        .map(|p| SecretVec::new(p.into_bytes()));
+    // Choose how to handle encrypted key material. The passphrase is taken from
+    // the environment, so it is not captured in shell history or the process
+    // argument list.
+    let policy = if let Some(pass) = std::env::var_os("ZCASHD_WALLET_PASSPHRASE") {
+        EncryptedKeyPolicy::Decrypt(SecretVec::new(pass.into_encoded_bytes()))
+    } else if std::env::var_os("ZCASHD_WALLET_SKIP_ENCRYPTED").is_some() {
+        EncryptedKeyPolicy::Skip
+    } else {
+        EncryptedKeyPolicy::Reject
+    };
 
     let bdb = BDBDump::from_file(&path)?;
     let dump = ZcashdDump::from_bdb_dump(&bdb, false)?;
-    let (wallet, unparsed) = ZcashdParser::parse_dump_with_key(&dump, false, passphrase)?;
+    let (wallet, unparsed) = ZcashdParser::parse_dump_with_policy(&dump, false, policy)?;
 
     println!("\n=== Wallet summary ===");
     println!("network:            {:?}", wallet.network());

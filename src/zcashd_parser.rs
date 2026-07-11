@@ -32,44 +32,99 @@ use crate::{
 };
 use zewif::Script;
 
+/// How to handle encrypted key material (`mkey`/`ckey`/`csapzkey`/`czkey`/
+/// `cmnemonicphrase`/`chdseed`) when parsing a `zcashd` wallet.
+///
+/// The variants correspond to the three ways a caller can approach an
+/// (encrypted or unencrypted) `wallet.dat`.
+#[derive(Default)]
+pub enum EncryptedKeyPolicy {
+    /// Require the wallet to be unencrypted: fail with
+    /// [`Error::EncryptedWalletRequiresPassphrase`] if any encrypted key
+    /// material is present. This is the default ([`ZcashdParser::parse_dump`]).
+    #[default]
+    Reject,
+
+    /// Decrypt encrypted key material with the given wallet passphrase, failing
+    /// (with [`Error::WrongWalletPassphrase`] or a [`DecryptionError`]) if
+    /// decryption does not succeed. A passphrase supplied for an unencrypted
+    /// wallet is simply unused.
+    Decrypt(SecretVec<u8>),
+
+    /// Skip any encrypted key material, migrating only the plaintext records.
+    /// For a caller who has lost their passphrase but still wants to recover
+    /// everything the wallet holds in the clear (viewing keys, addresses,
+    /// transactions, and any plaintext seeds).
+    Skip,
+}
+
 pub struct ZcashdParser<'a> {
     pub dump: &'a ZcashdDump,
     pub unparsed_keys: RefCell<HashSet<DBKey>>,
     pub strict: bool,
-    /// The wallet passphrase, supplied when the wallet is encrypted so its
-    /// spending keys can be decrypted on export.
-    key: Option<SecretVec<u8>>,
+    /// How to handle encrypted key material.
+    policy: EncryptedKeyPolicy,
 }
 
 impl<'a> ZcashdParser<'a> {
-    /// Parse an unencrypted wallet dump. Equivalent to
-    /// [`Self::parse_dump_with_key`] with no passphrase; parsing an encrypted
-    /// wallet this way fails with [`Error::EncryptedWalletRequiresPassphrase`].
+    /// Parse a wallet dump, requiring it to be unencrypted
+    /// ([`EncryptedKeyPolicy::Reject`]): an encrypted wallet fails with
+    /// [`Error::EncryptedWalletRequiresPassphrase`]. Use
+    /// [`Self::parse_dump_with_policy`] to decrypt or skip encrypted keys.
     pub fn parse_dump(dump: &ZcashdDump, strict: bool) -> Result<(ZcashdWallet, HashSet<DBKey>), Error> {
-        Self::parse_dump_with_key(dump, strict, None)
+        Self::parse_dump_with_policy(dump, strict, EncryptedKeyPolicy::Reject)
     }
 
-    /// Parse a wallet dump, decrypting encrypted key material with `key` (the
-    /// wallet passphrase) when the wallet is encrypted. Pass `None` for an
-    /// unencrypted wallet. Supplying a passphrase for an unencrypted wallet is
-    /// harmless — it is simply unused.
-    pub fn parse_dump_with_key(
+    /// Parse a wallet dump, handling encrypted key material according to
+    /// `policy` (decrypt with a passphrase, reject, or skip).
+    pub fn parse_dump_with_policy(
         dump: &ZcashdDump,
         strict: bool,
-        key: Option<SecretVec<u8>>,
+        policy: EncryptedKeyPolicy,
     ) -> Result<(ZcashdWallet, HashSet<DBKey>), Error> {
-        let parser = ZcashdParser::new(dump, strict, key);
+        let parser = ZcashdParser::new(dump, strict, policy);
         parser.parse()
     }
 
-    fn new(dump: &'a ZcashdDump, strict: bool, key: Option<SecretVec<u8>>) -> Self {
+    fn new(dump: &'a ZcashdDump, strict: bool, policy: EncryptedKeyPolicy) -> Self {
         let unparsed_keys = RefCell::new(dump.records().keys().cloned().collect());
         Self {
             dump,
             unparsed_keys,
             strict,
-            key,
+            policy,
         }
+    }
+
+    /// Whether the caller asked to skip (rather than decrypt or reject)
+    /// encrypted key material.
+    fn skip_encrypted(&self) -> bool {
+        matches!(self.policy, EncryptedKeyPolicy::Skip)
+    }
+
+    /// Mark every record of the given key types as handled, so that skipped
+    /// encrypted records are not reported as unparsed.
+    fn mark_records_parsed(&self, keynames: &[&str]) -> Result<(), Error> {
+        for keyname in keynames {
+            if self.dump.has_keys_for_keyname(keyname) {
+                for key in self.dump.records_for_keyname(keyname)?.keys() {
+                    self.mark_key_parsed(key);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Handle an encrypted record set that cannot be decrypted (no passphrase):
+    /// in [`EncryptedKeyPolicy::Skip`] mode, mark the given record types handled
+    /// and return `Ok`; otherwise fail. Only reached in `Skip` mode or for a
+    /// malformed wallet, since `Reject` fails earlier and `Decrypt` supplies a
+    /// key.
+    fn skip_or_reject_encrypted(&self, keynames: &[&str]) -> Result<(), Error> {
+        if !self.skip_encrypted() {
+            return Err(Error::EncryptedWalletRequiresPassphrase);
+        }
+        self.mark_records_parsed(keynames)
     }
 
     // Keep track of which keys have been parsed
@@ -87,7 +142,7 @@ impl<'a> ZcashdParser<'a> {
         // When the wallet is encrypted, derive its master key from the
         // passphrase; the transparent, Sapling, mnemonic, and legacy-seed
         // parsers below use it to decrypt their `c`-prefixed record variants.
-        let master_key = self.crypted_master_key()?;
+        let master_key = self.derive_master_key()?;
         let master_key = master_key.as_deref();
 
         //
@@ -283,7 +338,13 @@ impl<'a> ZcashdParser<'a> {
         // (pubkey -> encrypted scalar) instead of plaintext `key` records; the
         // per-key `keymeta` is retained unencrypted in both cases.
         if !self.dump.has_keys_for_keyname("key") && self.dump.has_keys_for_keyname("ckey") {
-            return self.parse_crypted_keys(master_key);
+            return match master_key {
+                Some(master_key) => self.parse_encrypted_keys(master_key),
+                None => {
+                    self.skip_or_reject_encrypted(&["ckey", "keymeta"])?;
+                    Ok(Keys::new(HashMap::new()))
+                }
+            };
         }
 
         let key_records = self
@@ -320,8 +381,7 @@ impl<'a> ZcashdParser<'a> {
     /// same `Keys` structure the plaintext `key` path produces. Each record's
     /// AES IV is the double-SHA-256 of the (unencrypted) public key stored in
     /// the record's BDB key.
-    fn parse_crypted_keys(&self, master_key: Option<&[u8; 32]>) -> Result<Keys, Error> {
-        let master_key = master_key.ok_or(Error::EncryptedWalletRequiresPassphrase)?;
+    fn parse_encrypted_keys(&self, master_key: &[u8; 32]) -> Result<Keys, Error> {
         let mut keys_map = HashMap::new();
         for (key, value) in self.dump.records_for_keyname("ckey")? {
             let pubkey = parse!(buf = &key.data, PubKey, "pubkey")?;
@@ -385,7 +445,13 @@ impl<'a> ZcashdParser<'a> {
             // An encrypted wallet stores its Sapling spending keys as
             // `csapzkey` records instead of plaintext `sapzkey` records.
             if self.dump.has_keys_for_keyname("csapzkey") {
-                return self.parse_crypted_sapling_keys(master_key);
+                return match master_key {
+                    Some(master_key) => self.parse_encrypted_sapling_keys(master_key),
+                    None => {
+                        self.skip_or_reject_encrypted(&["csapzkey", "sapzkeymeta"])?;
+                        Ok(SaplingKeys::new(keys_map))
+                    }
+                };
             }
             return Ok(SaplingKeys::new(keys_map));
         }
@@ -465,10 +531,16 @@ impl<'a> ZcashdParser<'a> {
 
     fn parse_sprout_keys(&self, _master_key: Option<&[u8; 32]>) -> Result<Option<SproutKeys>, Error> {
         if !self.dump.has_keys_for_keyname("zkey") {
-            // Encrypted Sprout spending keys (`czkey`) are not yet decrypted;
-            // refuse rather than silently drop spendable keys. Sprout has been
-            // deprecated since 2018 and is absent from essentially all wallets.
+            // Encrypted Sprout spending keys (`czkey`) are not decrypted even
+            // when a passphrase is supplied: Sprout has been deprecated since
+            // 2018 and no ground truth is available to validate the decryption.
+            // In `Skip` mode they are omitted; otherwise refuse rather than
+            // silently drop spendable keys.
             if self.dump.has_keys_for_keyname("czkey") {
+                if self.skip_encrypted() {
+                    self.mark_records_parsed(&["czkey", "zkeymeta"])?;
+                    return Ok(None);
+                }
                 return Err(Error::EncryptedSproutUnsupported);
             }
             return Ok(None);
@@ -620,7 +692,10 @@ impl<'a> ZcashdParser<'a> {
             // An encrypted wallet stores its legacy HD seed as a `chdseed`
             // record; the AES IV is the seed's ZIP-32 fingerprint (the record
             // key).
-            let master_key = master_key.ok_or(Error::EncryptedWalletRequiresPassphrase)?;
+            let Some(master_key) = master_key else {
+                self.skip_or_reject_encrypted(&["chdseed"])?;
+                return Ok(None);
+            };
             let (key, value) = self.dump.record_for_keyname("chdseed")?;
             // The record key is the 32-byte ZIP-32 seed fingerprint, used
             // directly as the AES IV source (its first 16 bytes).
@@ -647,7 +722,10 @@ impl<'a> ZcashdParser<'a> {
             // key). The decrypted plaintext is a serialized `MnemonicSeed`,
             // identical to a plaintext `mnemonicphrase` value.
             if self.dump.has_keys_for_keyname("cmnemonicphrase") {
-                let master_key = master_key.ok_or(Error::EncryptedWalletRequiresPassphrase)?;
+                let Some(master_key) = master_key else {
+                    self.skip_or_reject_encrypted(&["cmnemonicphrase"])?;
+                    return Ok(None);
+                };
                 let (key, value) = self.dump.record_for_keyname("cmnemonicphrase")?;
                 // The record key is the 32-byte ZIP-32 seed fingerprint, used
                 // directly as the AES IV source (its first 16 bytes).
@@ -856,18 +934,35 @@ impl<'a> ZcashdParser<'a> {
         Ok(transactions)
     }
 
-    /// Derive the wallet master key from the supplied passphrase, if the wallet
-    /// is encrypted (a `mkey` record is present). Returns `None` for an
-    /// unencrypted wallet, an error if the wallet is encrypted but no passphrase
-    /// was supplied or the passphrase is wrong.
-    fn crypted_master_key(&self) -> Result<Option<Zeroizing<[u8; 32]>>, Error> {
+    /// Derive the wallet master key for an encrypted wallet (a `mkey` record is
+    /// present), according to the configured [`EncryptedKeyPolicy`]:
+    ///
+    /// - `Decrypt`: derive and verify the master key from the passphrase.
+    /// - `Reject`: fail — the wallet is encrypted but decryption was not asked for.
+    /// - `Skip`: return `None`; the encrypted records are skipped downstream.
+    ///
+    /// Returns `None` for an unencrypted wallet regardless of policy.
+    fn derive_master_key(&self) -> Result<Option<Zeroizing<[u8; 32]>>, Error> {
         if !self.dump.has_keys_for_keyname("mkey") {
+            // Unencrypted wallet (a passphrase, if supplied, is simply unused).
             return Ok(None);
         }
-        let passphrase = self
-            .key
-            .as_ref()
-            .ok_or(Error::EncryptedWalletRequiresPassphrase)?;
+
+        let passphrase = match &self.policy {
+            EncryptedKeyPolicy::Decrypt(passphrase) => passphrase,
+            EncryptedKeyPolicy::Reject => {
+                return Err(Error::EncryptedWalletRequiresPassphrase);
+            }
+            EncryptedKeyPolicy::Skip => {
+                // Consume the `mkey` records so they are not reported as
+                // unparsed; the individual encrypted records are skipped by
+                // their respective parsers.
+                for key in self.dump.records_for_keyname("mkey")?.keys() {
+                    self.mark_key_parsed(key);
+                }
+                return Ok(None);
+            }
+        };
 
         // A wallet normally has exactly one `mkey`, but the format allows
         // several; try each, and accept the first whose derived master key
@@ -936,11 +1031,7 @@ impl<'a> ZcashdParser<'a> {
     /// same `SaplingKeys` structure the plaintext `sapzkey` path produces. Each
     /// record's AES IV is the ZIP-32 fingerprint of the full viewing key stored
     /// alongside the ciphertext.
-    fn parse_crypted_sapling_keys(
-        &self,
-        master_key: Option<&[u8; 32]>,
-    ) -> Result<SaplingKeys, Error> {
-        let master_key = master_key.ok_or(Error::EncryptedWalletRequiresPassphrase)?;
+    fn parse_encrypted_sapling_keys(&self, master_key: &[u8; 32]) -> Result<SaplingKeys, Error> {
         let mut keys_map = HashMap::new();
         for (key, value) in self.dump.records_for_keyname("csapzkey")? {
             let ivk = parse!(buf = &key.data, SaplingIncomingViewingKey, "ivk")?;
@@ -1110,7 +1201,7 @@ mod tests {
         let bdb_value = make_script_value(&redeem_script);
 
         let dump = dump_with_records(vec![(bdb_key, bdb_value)]);
-        let parser = ZcashdParser::new(&dump, true, None);
+        let parser = ZcashdParser::new(&dump, true, EncryptedKeyPolicy::Reject);
 
         let cscripts = parser.parse_cscripts().expect("parse_cscripts");
         assert_eq!(cscripts.len(), 1);
@@ -1135,7 +1226,7 @@ mod tests {
             (make_bdb_key("cscript", &id_a), make_script_value(&script_a)),
             (make_bdb_key("cscript", &id_b), make_script_value(&script_b)),
         ]);
-        let parser = ZcashdParser::new(&dump, true, None);
+        let parser = ZcashdParser::new(&dump, true, EncryptedKeyPolicy::Reject);
 
         let cscripts = parser.parse_cscripts().expect("parse_cscripts");
         assert_eq!(cscripts.len(), 2);
@@ -1166,7 +1257,7 @@ mod tests {
         let bdb_value = Data::from_slice(&[]);
 
         let dump = dump_with_records(vec![(bdb_key, bdb_value)]);
-        let parser = ZcashdParser::new(&dump, true, None);
+        let parser = ZcashdParser::new(&dump, true, EncryptedKeyPolicy::Reject);
 
         let watch_scripts = parser.parse_watch_scripts().expect("parse_watch_scripts");
         assert_eq!(watch_scripts.len(), 1);
@@ -1191,7 +1282,7 @@ mod tests {
         let bdb_value = Data::from_slice(&[]);
 
         let dump = dump_with_records(vec![(bdb_key, bdb_value)]);
-        let parser = ZcashdParser::new(&dump, true, None);
+        let parser = ZcashdParser::new(&dump, true, EncryptedKeyPolicy::Reject);
 
         let watch_scripts = parser.parse_watch_scripts().expect("parse_watch_scripts");
         assert_eq!(watch_scripts.len(), 1);
@@ -1212,7 +1303,7 @@ mod tests {
     #[test]
     fn parsers_return_empty_when_keys_absent() {
         let dump = dump_with_records(vec![]);
-        let parser = ZcashdParser::new(&dump, true, None);
+        let parser = ZcashdParser::new(&dump, true, EncryptedKeyPolicy::Reject);
 
         assert!(parser.parse_cscripts().expect("parse_cscripts").is_empty());
         assert!(parser.parse_watch_scripts().expect("parse_watch_scripts").is_empty());
