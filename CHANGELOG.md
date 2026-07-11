@@ -7,6 +7,12 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+### Changed
+- Updated to `zewif 1.0.0-rc.2`, which flattens the tagged-union wire encoding
+  to `[variant-id, body?]`. Exported documents use the revised encoding;
+  documents produced against `zewif 1.0.0-rc.1` do not decode with this
+  version.
+
 ## [0.1.0-rc.1] 2026-07-11
 
 Initial release candidate. This provides decoding from the historic zcashd
