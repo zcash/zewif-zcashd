@@ -1,6 +1,6 @@
 [package]
 name = "zewif-zcashd"
-version = "0.1.0-rc.1"
+version = "0.1.0-rc.2"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
@@ -9,7 +9,7 @@ homepage = "https://github.com/zcash/zewif-zcashd"
 repository = "https://github.com/zcash/zewif-zcashd"
 
 [dependencies]
-zewif = "1.0.0-rc.1"
+zewif = "1.0.0-rc.2"
 bitflags = "2"
 thiserror = "2"
 chrono = "0.4.39"

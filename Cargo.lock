@@ -923,18 +923,18 @@ checksum = "3d97bbf43eb4f088f8ca469930cde17fa036207c9a5e02ccc5107c4e8b17c964"
 
 [[package]]
 name = "minicbor"
-version = "1.1.0"
+version = "2.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "734daad4ff3b880f23dc2a675dd74553fa8e583367aa7523f96a16e96a516b62"
+checksum = "1b7a5041e12946f8b7d3f5a9d96383a19d694b9335457c522be7815b9abafb02"
 dependencies = [
  "minicbor-derive",
 ]
 
 [[package]]
 name = "minicbor-derive"
-version = "0.17.0"
+version = "0.19.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "512ce2c37128698ea15c99b3518936c78a8b112b92468e7b95b9fa045666ebd8"
+checksum = "7c9303a7d70578b101a21b3043ade4ab825c59063bbcd89af1066729399b79c6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1972,9 +1972,9 @@ dependencies = [
 
 [[package]]
 name = "zewif"
-version = "1.0.0-rc.1"
+version = "1.0.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9b2e34873580e94185e8068040c4e4404e1fe00b906693fe041954c7fad6136"
+checksum = "7abbade0d83234bfef4eeff61e115c667871dc164895209f30815bf301e5389b"
 dependencies = [
  "hex",
  "minicbor",
@@ -1983,7 +1983,7 @@ dependencies = [
 
 [[package]]
 name = "zewif-zcashd"
-version = "0.1.0-rc.1"
+version = "0.1.0-rc.2"
 dependencies = [
  "aes",
  "bech32 0.12.0",

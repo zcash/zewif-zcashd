@@ -7,6 +7,21 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+## [0.1.0-rc.2] 2026-07-11
+
+### Added
+- Support for decrypting the key material of passphrase-encrypted `zcashd`
+  wallets on export. `ZcashdParser::parse_dump_with_policy` takes an
+  `EncryptedKeyPolicy` to either decrypt the encrypted key records with a
+  supplied passphrase, reject an encrypted wallet, or skip its encrypted
+  records and migrate only the plaintext data.
+
+### Changed
+- Updated to `zewif 1.0.0-rc.2`, which flattens the tagged-union wire encoding
+  to `[variant-id, body?]`. Exported documents use the revised encoding;
+  documents produced against `zewif 1.0.0-rc.1` do not decode with this
+  version.
+
 ## [0.1.0-rc.1] 2026-07-11
 
 Initial release candidate. This provides decoding from the historic zcashd
