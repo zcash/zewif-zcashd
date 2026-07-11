@@ -1988,6 +1988,7 @@ dependencies = [
  "aes",
  "bech32 0.12.0",
  "bitflags",
+ "blake2b_simd",
  "bridgetree",
  "bs58",
  "byteorder",

@@ -4,7 +4,7 @@ use crate::{
     BdbDumpError, DumpError,
     migrate::MigrateError,
     parser::ParseError,
-    zcashd_wallet::{sapling::SaplingZPaymentAddress, transparent::ScriptId},
+    zcashd_wallet::{DecryptionError, sapling::SaplingZPaymentAddress, transparent::ScriptId},
 };
 
 /// The errors that can arise while reading a zcashd `wallet.dat` and
@@ -61,6 +61,27 @@ pub enum Error {
     /// The `hdseed` record's payload was not exactly 32 bytes.
     #[error("legacy HD seed must be exactly 32 bytes")]
     InvalidLegacySeedLength,
+
+    /// The wallet is encrypted (a `mkey` record is present) but no passphrase
+    /// was supplied to decrypt its keys.
+    #[error("wallet is encrypted; a passphrase is required to recover its spending keys")]
+    EncryptedWalletRequiresPassphrase,
+
+    /// A passphrase was supplied but did not unlock the wallet: the recovered
+    /// master key failed to decrypt a known key. Almost always a wrong
+    /// passphrase.
+    #[error("wallet passphrase is incorrect")]
+    WrongWalletPassphrase,
+
+    /// Decryption of an encrypted record failed.
+    #[error(transparent)]
+    Decryption(#[from] DecryptionError),
+
+    /// The wallet contains encrypted Sprout spending keys (`czkey`), which this
+    /// crate does not yet decrypt. Sprout has been deprecated since 2018 and is
+    /// absent from essentially all live wallets.
+    #[error("encrypted Sprout spending keys (czkey) are not yet supported")]
+    EncryptedSproutUnsupported,
 
     /// Two `name` records exist for one address.
     #[error("duplicate address in name records: {address}")]

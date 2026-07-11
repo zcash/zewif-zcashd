@@ -25,6 +25,7 @@ uuid = "1.1"
 aes = "0.8"
 cbc = "0.1"
 zeroize = "1"
+blake2b_simd = "1"
 
 # The following dependencies are chosen to exactly match those for `zcashd
 # 0.6.20` and should not be updated unless `zcashd` updates its dependency
@@ -45,6 +46,9 @@ incrementalmerkletree = "0.8"
 bridgetree = "0.7"
 bs58 = { version = "0.5.1", features = ["check"] }
 bech32 = "0.12"
+
+[dev-dependencies]
+hex = "0.4.3"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [

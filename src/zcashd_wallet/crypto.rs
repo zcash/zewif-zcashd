@@ -169,7 +169,7 @@ fn aes256_cbc_decrypt(
     ciphertext: &[u8],
 ) -> Result<Zeroizing<Vec<u8>>, DecryptionError> {
     // CBC requires a non-empty, block-aligned ciphertext.
-    if ciphertext.is_empty() || ciphertext.len() % IV_SIZE != 0 {
+    if ciphertext.is_empty() || !ciphertext.len().is_multiple_of(IV_SIZE) {
         return Err(DecryptionError::Decrypt);
     }
     let mut buf = Zeroizing::new(ciphertext.to_vec());
@@ -234,7 +234,7 @@ mod tests {
     }
 
     const fn is_hex(b: u8) -> bool {
-        matches!(b, b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F')
+        b.is_ascii_hexdigit()
     }
 
     const fn hex_val(b: u8) -> u8 {
