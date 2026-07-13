@@ -36,7 +36,7 @@ zcash_encoding = "0.4"
 zcash_keys = { version = "0.14", features = ["transparent-inputs", "sapling", "orchard", "zcashd-compat"] }
 zcash_primitives = "0.28"
 zcash_protocol = { version = "0.9", features = ["local-consensus"] }
-zcash_transparent = { version = "0.8", features = ["transparent-inputs"] }
+zcash_transparent = { version = "0.9", features = ["transparent-inputs"] }
 secp256k1 = "0.29"
 secrecy = "0.8"
 zip32 = "0.2"

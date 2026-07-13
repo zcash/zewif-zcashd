@@ -1778,7 +1778,21 @@ dependencies = [
  "corez",
  "f4jumble",
  "zcash_encoding",
- "zcash_protocol",
+ "zcash_protocol 0.9.0",
+]
+
+[[package]]
+name = "zcash_address"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a854b28c07dba372f4410ea8ad62b4bf7d5c2bf8be32fc4b31bc0db6521a975"
+dependencies = [
+ "bech32 0.11.1",
+ "bs58",
+ "corez",
+ "f4jumble",
+ "zcash_encoding",
+ "zcash_protocol 0.10.0",
 ]
 
 [[package]]
@@ -1816,10 +1830,10 @@ dependencies = [
  "secrecy",
  "subtle",
  "tracing",
- "zcash_address",
+ "zcash_address 0.12.0",
  "zcash_encoding",
- "zcash_protocol",
- "zcash_transparent",
+ "zcash_protocol 0.9.0",
+ "zcash_transparent 0.8.0",
  "zip32",
 ]
 
@@ -1861,9 +1875,9 @@ dependencies = [
  "sha2 0.10.9",
  "zcash_encoding",
  "zcash_note_encryption",
- "zcash_protocol",
+ "zcash_protocol 0.9.0",
  "zcash_script",
- "zcash_transparent",
+ "zcash_transparent 0.8.0",
 ]
 
 [[package]]
@@ -1871,6 +1885,19 @@ name = "zcash_protocol"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bec496a0bd62dae98c4b26f51c5dab112d0c5350bbc2ccfdfd05bb3454f714d"
+dependencies = [
+ "corez",
+ "document-features",
+ "hex",
+ "memuse",
+ "zcash_encoding",
+]
+
+[[package]]
+name = "zcash_protocol"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2973d210e74ebd81adc50828fbbb284ab6aaa099308097c42c47dc63cf3420fc"
 dependencies = [
  "corez",
  "document-features",
@@ -1922,9 +1949,34 @@ dependencies = [
  "secp256k1",
  "sha2 0.10.9",
  "subtle",
- "zcash_address",
+ "zcash_address 0.12.0",
  "zcash_encoding",
- "zcash_protocol",
+ "zcash_protocol 0.9.0",
+ "zcash_script",
+ "zcash_spec",
+ "zip32",
+]
+
+[[package]]
+name = "zcash_transparent"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72e0f8c142bed366ed5886dcfa8772ec90b5420cc127e6cdb76b6744c53a287b"
+dependencies = [
+ "bip32",
+ "bs58",
+ "corez",
+ "document-features",
+ "getset",
+ "hex",
+ "nonempty",
+ "ripemd 0.1.3",
+ "secp256k1",
+ "sha2 0.10.9",
+ "subtle",
+ "zcash_address 0.13.0",
+ "zcash_encoding",
+ "zcash_protocol 0.10.0",
  "zcash_script",
  "zcash_spec",
  "zip32",
@@ -2004,12 +2056,12 @@ dependencies = [
  "sha2 0.10.9",
  "thiserror 2.0.18",
  "uuid",
- "zcash_address",
+ "zcash_address 0.12.0",
  "zcash_encoding",
  "zcash_keys",
  "zcash_primitives",
- "zcash_protocol",
- "zcash_transparent",
+ "zcash_protocol 0.9.0",
+ "zcash_transparent 0.9.0",
  "zeroize",
  "zewif",
  "zip32",
