@@ -38,7 +38,7 @@ zcash_primitives = "0.28"
 zcash_protocol = { version = "0.9", features = ["local-consensus"] }
 zcash_transparent = { version = "0.8", features = ["transparent-inputs"] }
 secp256k1 = "0.29"
-secrecy = "0.8"
+secrecy = "0.10"
 zip32 = "0.2"
 orchard = "0.14"
 sapling = { package = "sapling-crypto", version = "0.7", features = ["temporary-zcashd"] }
