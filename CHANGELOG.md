@@ -7,6 +7,13 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+## [0.1.0-rc.3] 2026-07-17
+
+### Changed
+- Updated to `zewif 1.0.0-rc.3` that removes the leading magic bytes in favor
+  of self-describing CBOR, with an identifying tag registered via the RFC 8949
+  §9.2 process.
+
 ## [0.1.0-rc.2] 2026-07-11
 
 ### Added
