@@ -58,6 +58,13 @@ pub enum EncryptedKeyPolicy {
     Skip,
 }
 
+/// The combined version integer of zcashd 5.0.0, the first release to write
+/// `networkinfo` and `orchard_note_commitment_tree` records and whose
+/// (mnemonic-HD) wallets always carry transparent key material. A wallet
+/// whose own `version` record is at least this value must contain those
+/// record kinds, so their absence is corruption rather than age.
+const ZCASHD_5_0_0: u32 = 5_000_000;
+
 pub struct ZcashdParser<'a> {
     pub dump: &'a ZcashdDump,
     pub unparsed_keys: RefCell<HashSet<DBKey>>,
@@ -174,9 +181,14 @@ impl<'a> ZcashdParser<'a> {
         // hdseed
         let legacy_hd_seed = self.parse_hdseed(master_key)?;
 
+        // **version**: parsed out of alphabetical order because the writing
+        // client's version determines which record kinds must exist (see
+        // `parse_keys`).
+        let client_version = self.parse_client_version("version")?;
+
         // key
         // keymeta
-        let keys = self.parse_keys(master_key)?;
+        let keys = self.parse_keys(master_key, client_version)?;
 
         // **minversion**
         let min_version = self.parse_client_version("minversion")?;
@@ -206,9 +218,6 @@ impl<'a> ZcashdParser<'a> {
 
         // tx
         let transactions = self.parse_transactions(self.strict)?;
-
-        // **version**
-        let client_version = self.parse_client_version("version")?;
 
         // vkey
 
@@ -331,7 +340,11 @@ impl<'a> ZcashdParser<'a> {
         }
     }
 
-    fn parse_keys(&self, master_key: Option<&[u8; 32]>) -> Result<Keys, Error> {
+    fn parse_keys(
+        &self,
+        master_key: Option<&[u8; 32]>,
+        client_version: ClientVersion,
+    ) -> Result<Keys, Error> {
         // Plaintext `key` and encrypted `ckey` records are mutually exclusive:
         // zcashd erases the plaintext record when it writes the encrypted one
         // (`CWalletDB::WriteCryptedKey`). Refuse a wallet that somehow has both,
@@ -352,17 +365,29 @@ impl<'a> ZcashdParser<'a> {
             };
         }
 
-        let key_records = self
-            .dump
-            .records_for_keyname("key")?;
-        let keymeta_records = self
-            .dump
-            .records_for_keyname("keymeta")?;
+        let key_records = self.dump.records_for_keyname_or_empty("key")?;
+        let keymeta_records = self.dump.records_for_keyname_or_empty("keymeta")?;
+        // A key set of one size with a metadata set of another — including
+        // either set being absent entirely — is evidence of a stripped or
+        // hand-modified wallet; refuse rather than guess which set to trust.
         if key_records.len() != keymeta_records.len() {
             return Err(Error::MismatchedKeyMetadata {
                 keyname: "key",
                 metadata_keyname: "keymeta",
             });
+        }
+        if key_records.is_empty() {
+            // Transparent key material can be legitimately absent only from a
+            // pre-5.0.0 wallet (fresh or pure watch-only); a mnemonic-HD
+            // (5.0.0+) wallet always carries it, so absence there means the
+            // records were stripped or lost.
+            if client_version.version() >= ZCASHD_5_0_0 {
+                return Err(Error::MissingExpectedRecords {
+                    keyname: "key",
+                    version: client_version,
+                });
+            }
+            return Ok(Keys::new(HashMap::new()));
         }
         let mut keys_map = HashMap::new();
         for (key, value) in key_records {

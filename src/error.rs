@@ -4,7 +4,9 @@ use crate::{
     BdbDumpError, DumpError,
     migrate::MigrateError,
     parser::ParseError,
-    zcashd_wallet::{DecryptionError, sapling::SaplingZPaymentAddress, transparent::ScriptId},
+    zcashd_wallet::{
+        ClientVersion, DecryptionError, sapling::SaplingZPaymentAddress, transparent::ScriptId,
+    },
 };
 
 /// The errors that can arise while reading a zcashd `wallet.dat` and
@@ -61,6 +63,19 @@ pub enum Error {
     /// The `hdseed` record's payload was not exactly 32 bytes.
     #[error("legacy HD seed must be exactly 32 bytes")]
     InvalidLegacySeedLength,
+
+    /// A record kind that every wallet written by this client version carries
+    /// is absent from the dump. The wallet's own `version` record proves the
+    /// records existed, so their absence means the file was stripped or
+    /// corrupted; fail loudly rather than migrate a wallet with silently
+    /// missing data.
+    #[error(
+        "wallet was last written by zcashd {version}, which always writes {keyname:?} records, but the dump has none; the wallet file is likely stripped or corrupted"
+    )]
+    MissingExpectedRecords {
+        keyname: &'static str,
+        version: ClientVersion,
+    },
 
     /// The wallet is encrypted (a `mkey` record is present) but no passphrase
     /// was supplied to decrypt its keys.
