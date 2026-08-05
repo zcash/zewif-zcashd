@@ -8,7 +8,21 @@ pub struct NetworkInfo {
     network: Network,
 }
 
+/// The client name zcashd writes as the first element of the `networkinfo`
+/// pair: its `PACKAGE_NAME` (see `CWalletDB::WriteNetworkInfo`).
+const ZCASHD_PACKAGE_NAME: &str = "Zcash";
+
 impl NetworkInfo {
+    /// Synthesizes the record contents zcashd would write for the given
+    /// network. Used for wallets that predate the `networkinfo` record
+    /// (zcashd 5.0.0), whose network must be supplied by the caller.
+    pub fn for_network(network: Network) -> Self {
+        Self {
+            zcash: ZCASHD_PACKAGE_NAME.to_string(),
+            network,
+        }
+    }
+
     pub fn zcash(&self) -> &str {
         &self.zcash
     }

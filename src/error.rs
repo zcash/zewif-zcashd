@@ -77,6 +77,14 @@ pub enum Error {
         version: ClientVersion,
     },
 
+    /// The wallet predates the `networkinfo` record (written since zcashd
+    /// 5.0.0) and no fallback network was supplied, so the chain it belongs
+    /// to cannot be determined.
+    #[error(
+        "wallet has no networkinfo record; supply the wallet's network to parse this pre-5.0.0 wallet"
+    )]
+    MissingNetworkInfo,
+
     /// The wallet is encrypted (a `mkey` record is present) but no passphrase
     /// was supplied to decrypt its keys.
     #[error("wallet is encrypted; a passphrase is required to recover its spending keys")]

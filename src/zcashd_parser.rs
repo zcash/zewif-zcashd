@@ -8,7 +8,8 @@ use std::{
 use zcash_keys::keys::UnifiedFullViewingKey;
 use zeroize::Zeroizing;
 use zewif::{
-    Bip39Mnemonic, Data, LegacySeed, SeedFingerprint, TxId, sapling::SaplingIncomingViewingKey,
+    Bip39Mnemonic, Data, LegacySeed, Network, SeedFingerprint, TxId,
+    sapling::SaplingIncomingViewingKey,
 };
 
 use crate::{
@@ -58,6 +59,52 @@ pub enum EncryptedKeyPolicy {
     Skip,
 }
 
+/// Options controlling how a wallet dump is parsed.
+///
+/// The default is non-strict parsing that requires an unencrypted wallet
+/// ([`EncryptedKeyPolicy::Reject`]) and no fallback network.
+///
+/// Under every combination of options, record kinds absent from the dump
+/// parse as empty rather than erroring; see
+/// [`ZcashdParser::parse_dump_with_options`].
+#[derive(Default)]
+pub struct ParseOptions {
+    strict: bool,
+    policy: EncryptedKeyPolicy,
+    fallback_network: Option<Network>,
+}
+
+impl ParseOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Whether an unparseable transaction record fails the parse (`true`)
+    /// or is reported and skipped (`false`, the default).
+    pub fn strict(mut self, strict: bool) -> Self {
+        self.strict = strict;
+        self
+    }
+
+    /// How to handle encrypted key material; see [`EncryptedKeyPolicy`].
+    pub fn encrypted_key_policy(mut self, policy: EncryptedKeyPolicy) -> Self {
+        self.policy = policy;
+        self
+    }
+
+    /// The network to assume for a wallet that predates the `networkinfo`
+    /// record (written since zcashd 5.0.0).
+    ///
+    /// A wallet's own `networkinfo` record is authoritative and this value is
+    /// then ignored; without either, parsing fails with
+    /// [`Error::MissingNetworkInfo`] rather than silently guessing the chain
+    /// the wallet belongs to.
+    pub fn fallback_network(mut self, network: Network) -> Self {
+        self.fallback_network = Some(network);
+        self
+    }
+}
+
 /// The combined version integer of zcashd 5.0.0, the first release to write
 /// `networkinfo` and `orchard_note_commitment_tree` records and whose
 /// (mnemonic-HD) wallets always carry transparent key material. A wallet
@@ -71,6 +118,8 @@ pub struct ZcashdParser<'a> {
     pub strict: bool,
     /// How to handle encrypted key material.
     policy: EncryptedKeyPolicy,
+    /// The network to assume when the wallet has no `networkinfo` record.
+    fallback_network: Option<Network>,
 }
 
 impl<'a> ZcashdParser<'a> {
@@ -89,17 +138,57 @@ impl<'a> ZcashdParser<'a> {
         strict: bool,
         policy: EncryptedKeyPolicy,
     ) -> Result<(ZcashdWallet, HashSet<DBKey>), Error> {
-        let parser = ZcashdParser::new(dump, strict, policy);
+        Self::parse_dump_with_options(
+            dump,
+            ParseOptions::new().strict(strict).encrypted_key_policy(policy),
+        )
+    }
+
+    /// Parse a wallet dump according to the given [`ParseOptions`].
+    ///
+    /// This is the fully general entry point; use it when parsing a wallet
+    /// that predates the `networkinfo` record (zcashd 5.0.0), whose network
+    /// must be supplied via [`ParseOptions::fallback_network`].
+    ///
+    /// # Missing records
+    ///
+    /// This is a recovery and interchange tool, so the parser (through any of
+    /// its entry points) treats a record kind that is absent from the dump as
+    /// empty (or `None`) rather than as an error. Absence is usually
+    /// legitimate — a pre-Sapling wallet has no `orchard_note_commitment_tree`,
+    /// an encrypted wallet holds `ckey` records in place of `key` — and a
+    /// dump cannot distinguish a record that never existed from one that was
+    /// stripped. Two cross-checks bound that leniency:
+    ///
+    /// - The wallet's own `version` record: record kinds that every wallet
+    ///   written by zcashd 5.0.0 or later carries (`networkinfo`,
+    ///   `orchard_note_commitment_tree`, and transparent key material) must
+    ///   be present when the version implies them, else parsing fails with
+    ///   [`Error::MissingExpectedRecords`].
+    /// - Key/metadata symmetry: a key record set whose metadata record set
+    ///   is missing or of a different size (e.g. `key` without `keymeta`)
+    ///   fails with [`Error::MismatchedKeyMetadata`].
+    ///
+    /// Beyond that, a caller who expects particular contents must verify
+    /// them on the parsed wallet; the parser only guarantees that the
+    /// records that *are* present are consistent. The network is never
+    /// guessed: see [`ParseOptions::fallback_network`].
+    pub fn parse_dump_with_options(
+        dump: &ZcashdDump,
+        options: ParseOptions,
+    ) -> Result<(ZcashdWallet, HashSet<DBKey>), Error> {
+        let parser = ZcashdParser::new(dump, options);
         parser.parse()
     }
 
-    fn new(dump: &'a ZcashdDump, strict: bool, policy: EncryptedKeyPolicy) -> Self {
+    fn new(dump: &'a ZcashdDump, options: ParseOptions) -> Self {
         let unparsed_keys = RefCell::new(dump.records().keys().cloned().collect());
         Self {
             dump,
             unparsed_keys,
-            strict,
-            policy,
+            strict: options.strict,
+            policy: options.policy,
+            fallback_network: options.fallback_network,
         }
     }
 
@@ -183,7 +272,8 @@ impl<'a> ZcashdParser<'a> {
 
         // **version**: parsed out of alphabetical order because the writing
         // client's version determines which record kinds must exist (see
-        // `parse_keys` and `parse_orchard_note_commitment_tree`).
+        // `parse_keys`, `parse_network_info`, and
+        // `parse_orchard_note_commitment_tree`).
         let client_version = self.parse_client_version("version")?;
 
         // key
@@ -239,7 +329,7 @@ impl<'a> ZcashdParser<'a> {
         //
 
         // **networkinfo**
-        let network_info = self.parse_network_info()?;
+        let network_info = self.parse_network_info(client_version)?;
 
         // **orchard_note_commitment_tree**
         let orchard_note_commitment_tree =
@@ -841,7 +931,27 @@ impl<'a> ZcashdParser<'a> {
         Ok(sapling_z_addresses)
     }
 
-    fn parse_network_info(&self) -> Result<NetworkInfo, Error> {
+    fn parse_network_info(&self, client_version: ClientVersion) -> Result<NetworkInfo, Error> {
+        if !self.dump.has_value_for_keyname("networkinfo") {
+            // Every zcashd since 5.0.0 writes the record on wallet load, so
+            // absence from a wallet last written by 5.0.0+ means the dump was
+            // stripped or corrupted — never substitute the fallback network
+            // for a record that must have existed.
+            if client_version.version() >= ZCASHD_5_0_0 {
+                return Err(Error::MissingExpectedRecords {
+                    keyname: "networkinfo",
+                    version: client_version,
+                });
+            }
+            // The record was introduced in zcashd 5.0.0; for an older wallet
+            // the caller must identify the network via
+            // [`ParseOptions::fallback_network`].
+            return self
+                .fallback_network
+                .clone()
+                .map(NetworkInfo::for_network)
+                .ok_or(Error::MissingNetworkInfo);
+        }
         let value = self
             .value_for_keyname("networkinfo")?;
         let network_info = parse!(buf = value.as_data(), NetworkInfo, "network info")?;
@@ -1234,6 +1344,17 @@ mod tests {
         ZcashdDump::from_bdb_dump(&bdb, true).expect("from_bdb_dump")
     }
 
+    /// A client version predating the zcashd 5.0.0 record requirements.
+    fn pre_v5() -> ClientVersion {
+        ClientVersion::from_integer(4_070_050)
+    }
+
+    /// A client version (5.0.0) whose wallets must carry `networkinfo`,
+    /// `orchard_note_commitment_tree`, and transparent key records.
+    fn v5() -> ClientVersion {
+        ClientVersion::from_integer(5_000_050)
+    }
+
     /// Verifies `parse_cscripts` plumbs BDB records all the way through to a
     /// `HashMap<ScriptId, Script>` keyed by the 20-byte script hash carried in
     /// the BDB key, with the value-side bytes preserved verbatim.
@@ -1246,7 +1367,7 @@ mod tests {
         let bdb_value = make_script_value(&redeem_script);
 
         let dump = dump_with_records(vec![(bdb_key, bdb_value)]);
-        let parser = ZcashdParser::new(&dump, true, EncryptedKeyPolicy::Reject);
+        let parser = ZcashdParser::new(&dump, ParseOptions::new().strict(true));
 
         let cscripts = parser.parse_cscripts().expect("parse_cscripts");
         assert_eq!(cscripts.len(), 1);
@@ -1271,7 +1392,7 @@ mod tests {
             (make_bdb_key("cscript", &id_a), make_script_value(&script_a)),
             (make_bdb_key("cscript", &id_b), make_script_value(&script_b)),
         ]);
-        let parser = ZcashdParser::new(&dump, true, EncryptedKeyPolicy::Reject);
+        let parser = ZcashdParser::new(&dump, ParseOptions::new().strict(true));
 
         let cscripts = parser.parse_cscripts().expect("parse_cscripts");
         assert_eq!(cscripts.len(), 2);
@@ -1302,7 +1423,7 @@ mod tests {
         let bdb_value = Data::from_slice(&[]);
 
         let dump = dump_with_records(vec![(bdb_key, bdb_value)]);
-        let parser = ZcashdParser::new(&dump, true, EncryptedKeyPolicy::Reject);
+        let parser = ZcashdParser::new(&dump, ParseOptions::new().strict(true));
 
         let watch_scripts = parser.parse_watch_scripts().expect("parse_watch_scripts");
         assert_eq!(watch_scripts.len(), 1);
@@ -1327,7 +1448,7 @@ mod tests {
         let bdb_value = Data::from_slice(&[]);
 
         let dump = dump_with_records(vec![(bdb_key, bdb_value)]);
-        let parser = ZcashdParser::new(&dump, true, EncryptedKeyPolicy::Reject);
+        let parser = ZcashdParser::new(&dump, ParseOptions::new().strict(true));
 
         let watch_scripts = parser.parse_watch_scripts().expect("parse_watch_scripts");
         assert_eq!(watch_scripts.len(), 1);
@@ -1348,9 +1469,128 @@ mod tests {
     #[test]
     fn parsers_return_empty_when_keys_absent() {
         let dump = dump_with_records(vec![]);
-        let parser = ZcashdParser::new(&dump, true, EncryptedKeyPolicy::Reject);
+        let parser = ZcashdParser::new(&dump, ParseOptions::new().strict(true));
 
         assert!(parser.parse_cscripts().expect("parse_cscripts").is_empty());
         assert!(parser.parse_watch_scripts().expect("parse_watch_scripts").is_empty());
+    }
+
+    /// Records that pre-5.0.0 wallets may lack entirely parse as empty
+    /// collections (or `None`) when absent.
+    #[test]
+    fn pre_v5_optional_records_default_when_absent() {
+        let dump = dump_with_records(vec![]);
+        let parser = ZcashdParser::new(&dump, ParseOptions::new().strict(true));
+
+        assert!(parser.parse_address_names().expect("names").is_empty());
+        assert!(parser.parse_address_purposes().expect("purposes").is_empty());
+        assert!(parser.parse_key_pool().expect("key pool").is_empty());
+        assert!(
+            parser
+                .parse_keys(None, pre_v5())
+                .expect("keys")
+                .keypairs()
+                .next()
+                .is_none()
+        );
+        assert_eq!(parser.parse_opt_i64("witnesscachesize").expect("opt i64"), None);
+    }
+
+    /// A pre-5.0.0 wallet without an `orchard_note_commitment_tree` record
+    /// has no Orchard state: the tree parses as empty.
+    #[test]
+    fn missing_orchard_tree_parses_as_empty() {
+        let dump = dump_with_records(vec![]);
+        let parser = ZcashdParser::new(&dump, ParseOptions::new().strict(true));
+
+        let tree = parser
+            .parse_orchard_note_commitment_tree(pre_v5())
+            .expect("empty tree");
+        assert!(tree.last_checkpoint().is_none());
+        assert!(tree.note_positions().is_empty());
+    }
+
+    /// An `orchard_note_commitment_tree` record shorter than its leading
+    /// client-version prefix is a parse error, not a panic.
+    #[test]
+    fn truncated_orchard_tree_record_is_an_error() {
+        let dump = dump_with_records(vec![(
+            make_bdb_key("orchard_note_commitment_tree", &[]),
+            Data::from_slice(&[0x01, 0x02]),
+        )]);
+        let parser = ZcashdParser::new(&dump, ParseOptions::new().strict(true));
+
+        assert!(parser.parse_orchard_note_commitment_tree(v5()).is_err());
+    }
+
+    /// Without a `networkinfo` record, the caller-supplied fallback network
+    /// identifies a pre-5.0.0 chain; without either, parsing fails
+    /// explicitly.
+    #[test]
+    fn missing_networkinfo_uses_the_fallback_network() {
+        let dump = dump_with_records(vec![]);
+
+        let parser = ZcashdParser::new(
+            &dump,
+            ParseOptions::new()
+                .strict(true)
+                .fallback_network(Network::Testnet),
+        );
+        let info = parser.parse_network_info(pre_v5()).expect("fallback network");
+        assert_eq!(info.network(), &Network::Testnet);
+
+        let parser = ZcashdParser::new(&dump, ParseOptions::new().strict(true));
+        match parser.parse_network_info(pre_v5()) {
+            Err(Error::MissingNetworkInfo) => {}
+            other => panic!("expected MissingNetworkInfo, got {other:?}"),
+        }
+    }
+
+    /// A wallet last written by zcashd 5.0.0+ always carries `networkinfo`,
+    /// `orchard_note_commitment_tree`, and transparent key records, so their
+    /// absence is stripping or corruption and fails loudly — in particular,
+    /// the fallback network is never substituted for a `networkinfo` record
+    /// that must have existed.
+    #[test]
+    fn v5_wallet_missing_expected_records_is_rejected() {
+        let dump = dump_with_records(vec![]);
+        let parser = ZcashdParser::new(
+            &dump,
+            ParseOptions::new()
+                .strict(true)
+                .fallback_network(Network::Testnet),
+        );
+
+        for result in [
+            parser.parse_network_info(v5()).map(drop),
+            parser.parse_orchard_note_commitment_tree(v5()).map(drop),
+            parser.parse_keys(None, v5()).map(drop),
+        ] {
+            match result {
+                Err(Error::MissingExpectedRecords { .. }) => {}
+                other => panic!("expected MissingExpectedRecords, got {other:?}"),
+            }
+        }
+    }
+
+    /// `key` records without their `keymeta` counterparts — or vice versa —
+    /// are evidence of a stripped wallet and fail with
+    /// `MismatchedKeyMetadata`, not a raw keyname-not-found error or a
+    /// silently empty key set.
+    #[test]
+    fn orphaned_key_or_keymeta_records_are_rejected() {
+        // Garbage record contents are fine: the count check fires before any
+        // record is parsed.
+        for keyname in ["key", "keymeta"] {
+            let dump = dump_with_records(vec![(
+                make_bdb_key(keyname, &[0x02; 33]),
+                Data::from_slice(&[0x01]),
+            )]);
+            let parser = ZcashdParser::new(&dump, ParseOptions::new().strict(true));
+            match parser.parse_keys(None, pre_v5()) {
+                Err(Error::MismatchedKeyMetadata { keyname: "key", .. }) => {}
+                other => panic!("expected MismatchedKeyMetadata, got {other:?}"),
+            }
+        }
     }
 }
