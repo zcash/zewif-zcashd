@@ -106,10 +106,8 @@ impl<'a> ZcashdParser<'a> {
     /// encrypted records are not reported as unparsed.
     fn mark_records_parsed(&self, keynames: &[&str]) -> Result<(), Error> {
         for keyname in keynames {
-            if self.dump.has_keys_for_keyname(keyname) {
-                for key in self.dump.records_for_keyname(keyname)?.keys() {
-                    self.mark_key_parsed(key);
-                }
+            for key in self.dump.records_for_keyname_or_empty(keyname)?.keys() {
+                self.mark_key_parsed(key);
             }
         }
         Ok(())
@@ -218,7 +216,7 @@ impl<'a> ZcashdParser<'a> {
         let watch_scripts = self.parse_watch_scripts()?;
 
         // **witnesscachesize**
-        let witnesscachesize = self.parse_i64("witnesscachesize")?;
+        let witnesscachesize = self.parse_opt_i64("witnesscachesize")?;
 
         // wkey
         let wallet_keys = self.parse_wallet_keys()?;
@@ -424,12 +422,7 @@ impl<'a> ZcashdParser<'a> {
     }
 
     fn parse_wallet_keys(&self) -> Result<Option<WalletKeys>, Error> {
-        if !self.dump.has_keys_for_keyname("wkey") {
-            return Ok(None);
-        }
-        let key_records = self
-            .dump
-            .records_for_keyname("wkey")?;
+        let key_records = self.dump.records_for_keyname_or_empty("wkey")?;
         if key_records.is_empty() {
             return Ok(None);
         }
@@ -476,12 +469,10 @@ impl<'a> ZcashdParser<'a> {
             }
             return Ok(SaplingKeys::new(keys_map));
         }
-        let key_records = self
-            .dump
-            .records_for_keyname("sapzkey")?;
-        let keymeta_records = self
-            .dump
-            .records_for_keyname("sapzkeymeta")?;
+        let key_records = self.dump.records_for_keyname("sapzkey")?;
+        // Fetched leniently so wholly absent metadata is reported as the
+        // mismatch it is, not as a missing keyname.
+        let keymeta_records = self.dump.records_for_keyname_or_empty("sapzkeymeta")?;
         if key_records.len() != keymeta_records.len() {
             return Err(Error::MismatchedKeyMetadata {
                 keyname: "sapzkey",
@@ -514,13 +505,7 @@ impl<'a> ZcashdParser<'a> {
         &self,
     ) -> Result<HashMap<SaplingIncomingViewingKey, ::sapling::zip32::ExtendedFullViewingKey>, Error> {
         let mut viewing_keys = HashMap::new();
-        if !self.dump.has_keys_for_keyname("sapextfvk") {
-            return Ok(viewing_keys);
-        }
-        let records = self
-            .dump
-            .records_for_keyname("sapextfvk")?;
-        for (key, value) in records {
+        for (key, value) in self.dump.records_for_keyname_or_empty("sapextfvk")? {
             let extfvk = parse!(
                 buf = &key.data,
                 ::sapling::zip32::ExtendedFullViewingKey,
@@ -571,12 +556,10 @@ impl<'a> ZcashdParser<'a> {
             }
             return Ok(None);
         }
-        let zkey_records = self
-            .dump
-            .records_for_keyname("zkey")?;
-        let zkeymeta_records = self
-            .dump
-            .records_for_keyname("zkeymeta")?;
+        let zkey_records = self.dump.records_for_keyname("zkey")?;
+        // Fetched leniently so wholly absent metadata is reported as the
+        // mismatch it is, not as a missing keyname.
+        let zkeymeta_records = self.dump.records_for_keyname_or_empty("zkeymeta")?;
         if zkey_records.len() != zkeymeta_records.len() {
             return Err(Error::MismatchedKeyMetadata {
                 keyname: "zkey",
@@ -617,13 +600,7 @@ impl<'a> ZcashdParser<'a> {
 
     fn parse_send_recipients(&self) -> Result<HashMap<TxId, Vec<RecipientMapping>>, Error> {
         let mut send_recipients: HashMap<TxId, Vec<RecipientMapping>> = HashMap::new();
-        if !self.dump.has_keys_for_keyname("recipientmapping") {
-            return Ok(send_recipients);
-        }
-        let records = self
-            .dump
-            .records_for_keyname("recipientmapping")?;
-        for (key, value) in records {
+        for (key, value) in self.dump.records_for_keyname_or_empty("recipientmapping")? {
             let mut p = Parser::new(&key.data);
             let txid = parse!(&mut p, TxId, "txid")?;
             let recipient_address = parse!(&mut p, RecipientAddress, "recipient_address")?;
@@ -660,7 +637,7 @@ impl<'a> ZcashdParser<'a> {
             self.mark_key_parsed(&key);
         }
 
-        let account_metadata_records = self.dump.records_for_keyname("unifiedaccount")?;
+        let account_metadata_records = self.dump.records_for_keyname_or_empty("unifiedaccount")?;
         let mut account_metadata = HashMap::new();
         for (key, value) in account_metadata_records {
             let metadata = parse!(
@@ -676,7 +653,7 @@ impl<'a> ZcashdParser<'a> {
             self.mark_key_parsed(&key);
         }
 
-        let full_viewing_keys_records = self.dump.records_for_keyname("unifiedfvk")?;
+        let full_viewing_keys_records = self.dump.records_for_keyname_or_empty("unifiedfvk")?;
         let mut full_viewing_keys = HashMap::new();
         for (key, value) in full_viewing_keys_records {
             let key_id = parse!(
@@ -779,11 +756,9 @@ impl<'a> ZcashdParser<'a> {
     }
 
     fn parse_address_names(&self) -> Result<HashMap<Address, String>, Error> {
-        let records = self
-            .dump
-            .records_for_keyname("name")?;
         let mut address_names = HashMap::new();
-        for (key, value) in records {
+        // A wallet with no labelled addresses has no `name` records.
+        for (key, value) in self.dump.records_for_keyname_or_empty("name")? {
             let address = parse!(buf = &key.data, Address, "address")?;
             let name = parse!(buf = value.as_data(), String, "name")?;
             if address_names.contains_key(&address) {
@@ -799,11 +774,9 @@ impl<'a> ZcashdParser<'a> {
     }
 
     fn parse_address_purposes(&self) -> Result<HashMap<Address, String>, Error> {
-        let records = self
-            .dump
-            .records_for_keyname("purpose")?;
         let mut address_purposes = HashMap::new();
-        for (key, value) in records {
+        // A wallet with no address book entries has no `purpose` records.
+        for (key, value) in self.dump.records_for_keyname_or_empty("purpose")? {
             let address = parse!(buf = &key.data, Address, "address")?;
             let purpose = parse!(buf = value.as_data(), String, "purpose")?;
             if address_purposes.contains_key(&address) {
@@ -822,13 +795,7 @@ impl<'a> ZcashdParser<'a> {
         &self,
     ) -> Result<HashMap<SaplingZPaymentAddress, SaplingIncomingViewingKey>, Error> {
         let mut sapling_z_addresses = HashMap::new();
-        if !self.dump.has_keys_for_keyname("sapzaddr") {
-            return Ok(sapling_z_addresses);
-        }
-        let records = self
-            .dump
-            .records_for_keyname("sapzaddr")?;
-        for (key, value) in records {
+        for (key, value) in self.dump.records_for_keyname_or_empty("sapzaddr")? {
             let payment_address =
                 parse!(buf = &key.data, SaplingZPaymentAddress, "payment address")?;
             let viewing_key = parse!(
@@ -867,11 +834,10 @@ impl<'a> ZcashdParser<'a> {
     }
 
     fn parse_key_pool(&self) -> Result<HashMap<i64, KeyPoolEntry>, Error> {
-        let records = self
-            .dump
-            .records_for_keyname("pool")?;
         let mut key_pool = HashMap::new();
-        for (key, value) in records {
+        // A wallet whose keypool has been drained (or never filled) has no
+        // `pool` records.
+        for (key, value) in self.dump.records_for_keyname_or_empty("pool")? {
             let index = parse!(buf = &key.data, i64, "key pool index")?;
             let entry = parse!(buf = value.as_data(), KeyPoolEntry, "key pool entry")?;
             key_pool.insert(index, entry);
@@ -883,13 +849,7 @@ impl<'a> ZcashdParser<'a> {
 
     fn parse_cscripts(&self) -> Result<HashMap<ScriptId, Script>, Error> {
         let mut cscripts = HashMap::new();
-        if !self.dump.has_keys_for_keyname("cscript") {
-            return Ok(cscripts);
-        }
-        let records = self
-            .dump
-            .records_for_keyname("cscript")?;
-        for (key, value) in records {
+        for (key, value) in self.dump.records_for_keyname_or_empty("cscript")? {
             let script_id = parse!(buf = &key.data, ScriptId, "cscript ScriptID")?;
             let script = parse!(buf = value.as_data(), Script, "cscript redeem script")?;
             if cscripts.contains_key(&script_id) {
@@ -903,12 +863,7 @@ impl<'a> ZcashdParser<'a> {
     }
 
     fn parse_watch_scripts(&self) -> Result<Vec<WatchScript>, Error> {
-        if !self.dump.has_keys_for_keyname("watchs") {
-            return Ok(Vec::new());
-        }
-        let records = self
-            .dump
-            .records_for_keyname("watchs")?;
+        let records = self.dump.records_for_keyname_or_empty("watchs")?;
         // Sort by BDB key bytes so the resulting `Vec` is deterministic
         // across runs. BDB primary-key uniqueness already guarantees no
         // duplicates, so an explicit dedupe set is unnecessary.
@@ -926,36 +881,32 @@ impl<'a> ZcashdParser<'a> {
     fn parse_transactions(&self, strict: bool) -> Result<HashMap<TxId, WalletTx>, Error> {
         let mut transactions = HashMap::new();
         // Some wallet files don't have any transactions
-        if self.dump.has_keys_for_keyname("tx") {
-            let records = self
-                .dump
-                .records_for_keyname("tx")?;
-            let mut sorted_records: Vec<_> = records.into_iter().collect();
-            sorted_records.sort_by(|(key1, _), (key2, _)| key1.data.cmp(&key2.data));
-            for (key, value) in sorted_records {
-                let txid = parse!(buf = &key.data, TxId, "transaction ID")?;
-                let trace = false;
-                match parse!(buf = value.as_data(), WalletTx, "transaction", trace) {
-                    Ok(transaction) => {
-                        if transactions.contains_key(&txid) {
-                            return Err(Error::DuplicateTransaction { txid });
-                        }
-                        transactions.insert(txid, transaction);
+        let records = self.dump.records_for_keyname_or_empty("tx")?;
+        let mut sorted_records: Vec<_> = records.into_iter().collect();
+        sorted_records.sort_by(|(key1, _), (key2, _)| key1.data.cmp(&key2.data));
+        for (key, value) in sorted_records {
+            let txid = parse!(buf = &key.data, TxId, "transaction ID")?;
+            let trace = false;
+            match parse!(buf = value.as_data(), WalletTx, "transaction", trace) {
+                Ok(transaction) => {
+                    if transactions.contains_key(&txid) {
+                        return Err(Error::DuplicateTransaction { txid });
                     }
-                    Err(e) if !strict => {
-                        eprintln!(
-                            "Unable to parse transaction data {}: {}",
-                            value.as_data().encode_hex::<String>(),
-                            e
-                        );
-                    }
-                    err => {
-                        err?;
-                    }
+                    transactions.insert(txid, transaction);
                 }
-
-                self.mark_key_parsed(&key);
+                Err(e) if !strict => {
+                    eprintln!(
+                        "Unable to parse transaction data {}: {}",
+                        value.as_data().encode_hex::<String>(),
+                        e
+                    );
+                }
+                err => {
+                    err?;
+                }
             }
+
+            self.mark_key_parsed(&key);
         }
         Ok(transactions)
     }
@@ -1034,10 +985,12 @@ impl<'a> ZcashdParser<'a> {
     /// public key. Returns `true` when there is no `ckey` to check against
     /// (correctness is then established when the individual records decrypt).
     fn master_key_verifies(&self, master_key: &[u8; 32]) -> Result<bool, Error> {
-        if !self.dump.has_keys_for_keyname("ckey") {
-            return Ok(true);
-        }
-        let Some((key, value)) = self.dump.records_for_keyname("ckey")?.into_iter().next() else {
+        let Some((key, value)) = self
+            .dump
+            .records_for_keyname_or_empty("ckey")?
+            .into_iter()
+            .next()
+        else {
             return Ok(true);
         };
         let pubkey = parse!(buf = &key.data, PubKey, "pubkey")?;

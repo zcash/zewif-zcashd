@@ -73,7 +73,7 @@ pub struct ZcashdWallet {
     transactions: HashMap<TxId, WalletTx>,
     unified_accounts: UnifiedAccounts,
     watch_scripts: Vec<WatchScript>,
-    witnesscachesize: i64,
+    witnesscachesize: Option<i64>,
 }
 
 impl ZcashdWallet {
@@ -107,7 +107,7 @@ impl ZcashdWallet {
         transactions: HashMap<TxId, WalletTx>,
         unified_accounts: UnifiedAccounts,
         watch_scripts: Vec<WatchScript>,
-        witnesscachesize: i64,
+        witnesscachesize: Option<i64>,
     ) -> Self {
         ZcashdWallet {
             address_names,
@@ -258,7 +258,9 @@ impl ZcashdWallet {
         &self.watch_scripts
     }
 
-    pub fn witnesscachesize(&self) -> i64 {
+    /// The Sprout/Sapling witness cache size, absent in wallets that were
+    /// never touched by a zcashd version that records it.
+    pub fn witnesscachesize(&self) -> Option<i64> {
         self.witnesscachesize
     }
 }
