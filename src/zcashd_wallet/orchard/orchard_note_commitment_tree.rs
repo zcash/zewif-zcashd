@@ -50,6 +50,21 @@ pub struct OrchardNoteCommitmentTree {
 impl OrchardNoteCommitmentTree {
     const NOTE_STATE_V1: u8 = 1;
 
+    /// The maximum number of checkpoints zcashd's Orchard wallet retains
+    /// (`MAX_CHECKPOINTS` in zcashd's `src/rust/src/wallet.rs`).
+    const MAX_CHECKPOINTS: usize = 100;
+
+    /// An empty tree tracking no notes, as held by a wallet that has never
+    /// recorded an `orchard_note_commitment_tree` record (one that predates
+    /// NU5 support in zcashd 5.0.0).
+    pub fn empty() -> Self {
+        Self {
+            last_checkpoint: None,
+            commitment_tree: BridgeTree::new(Self::MAX_CHECKPOINTS),
+            note_positions: Vec::new(),
+        }
+    }
+
     /// The last checkpoint recorded in the commitment tree, if any.
     pub fn last_checkpoint(&self) -> Option<BlockHeight> {
         self.last_checkpoint

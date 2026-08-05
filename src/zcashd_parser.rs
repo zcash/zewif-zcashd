@@ -183,7 +183,7 @@ impl<'a> ZcashdParser<'a> {
 
         // **version**: parsed out of alphabetical order because the writing
         // client's version determines which record kinds must exist (see
-        // `parse_keys`).
+        // `parse_keys` and `parse_orchard_note_commitment_tree`).
         let client_version = self.parse_client_version("version")?;
 
         // key
@@ -242,7 +242,8 @@ impl<'a> ZcashdParser<'a> {
         let network_info = self.parse_network_info()?;
 
         // **orchard_note_commitment_tree**
-        let orchard_note_commitment_tree = self.parse_orchard_note_commitment_tree()?;
+        let orchard_note_commitment_tree =
+            self.parse_orchard_note_commitment_tree(client_version)?;
 
         // unifiedaccount
 
@@ -847,14 +848,36 @@ impl<'a> ZcashdParser<'a> {
         Ok(network_info)
     }
 
-    fn parse_orchard_note_commitment_tree(&self) -> Result<OrchardNoteCommitmentTree, Error> {
-        let value = self
-            .value_for_keyname("orchard_note_commitment_tree")?;
+    fn parse_orchard_note_commitment_tree(
+        &self,
+        client_version: ClientVersion,
+    ) -> Result<OrchardNoteCommitmentTree, Error> {
+        if !self.dump.has_value_for_keyname("orchard_note_commitment_tree") {
+            // Every zcashd since 5.0.0 (NU5 support) writes the record, so
+            // absence from a wallet last written by 5.0.0+ means the dump was
+            // stripped or corrupted; treating it as an empty tree would
+            // silently drop the witness data needed to spend Orchard notes.
+            if client_version.version() >= ZCASHD_5_0_0 {
+                return Err(Error::MissingExpectedRecords {
+                    keyname: "orchard_note_commitment_tree",
+                    version: client_version,
+                });
+            }
+            // An older wallet simply has no Orchard state.
+            return Ok(OrchardNoteCommitmentTree::empty());
+        }
+        let value = self.value_for_keyname("orchard_note_commitment_tree")?;
+        // The value is the writing node's client serialization version
+        // (`OrchardWalletNoteCommitmentTreeWriter::Serialize`) followed by
+        // the tree payload.
+        let mut p = Parser::new(value.as_data());
+        let _client_version = parse!(&mut p, i32, "orchard tree client version")?;
         let orchard_note_commitment_tree = parse!(
-            buf = &&value.as_data()[4..],
+            &mut p,
             OrchardNoteCommitmentTree,
             "orchard note commitment tree"
         )?;
+        p.check_finished()?;
         Ok(orchard_note_commitment_tree)
     }
 
