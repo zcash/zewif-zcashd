@@ -43,6 +43,14 @@ and this library adheres to Rust's notion of
   generic "keyname not found" error, as the asymmetry is evidence of a
   stripped or hand-modified wallet.
 
+### Fixed
+- A regtest wallet's unified full viewing keys and unified addresses are now
+  encoded with regtest HRPs (`uviewregtest…`, `uregtest…`) when the caller
+  supplies `RegtestActivations` to `migrate_to_zewif`, instead of the testnet
+  HRPs that importers decoding against regtest parameters reject. Without
+  supplied activations they are still encoded as for the test network, matching
+  the wallet's transparent addresses.
+
 ## [0.1.0-rc.3] 2026-07-17
 
 ### Changed

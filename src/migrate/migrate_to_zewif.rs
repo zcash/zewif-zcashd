@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 
-use zcash_protocol::consensus::BranchId;
+use zcash_protocol::consensus::{self, BranchId, NetworkType, NetworkUpgrade, Parameters};
 use zcash_protocol::local_consensus::LocalNetwork;
 use zewif::{BlockHash, BlockHeight, Network, RegtestParams, Secrets, Zewif, ZewifWallet};
 
 use crate::migrate::MigrateError;
-use crate::ZcashdWallet;
+use crate::{ZcashdWallet, zcashd_wallet::NetworkInfo};
 
 use super::{
     attach_received_outputs, attach_sent_outputs, build_accounts, build_address_book,
@@ -58,6 +58,56 @@ fn regtest_params_from_local(local: &LocalNetwork) -> RegtestParams {
     RegtestParams::new(activations)
 }
 
+/// The consensus parameters used to encode HRP-bearing material — unified full
+/// viewing keys and unified addresses — in the exported document.
+///
+/// Transparent address encodings are identical on the test and regtest
+/// networks, but their bech32 HRPs differ: a regtest wallet's unified material
+/// must carry regtest HRPs (`uviewregtest…`, `uregtest…`), or an importer
+/// decoding it against regtest parameters will reject it.
+#[derive(Clone, Debug)]
+enum AddressEncodingParams {
+    /// The global network parameters matching the wallet's network record.
+    Global(consensus::Network),
+    /// Caller-supplied local parameters for a regtest wallet.
+    Local(LocalNetwork),
+}
+
+impl Parameters for AddressEncodingParams {
+    fn network_type(&self) -> NetworkType {
+        match self {
+            Self::Global(network) => network.network_type(),
+            Self::Local(local) => local.network_type(),
+        }
+    }
+
+    fn activation_height(&self, nu: NetworkUpgrade) -> Option<consensus::BlockHeight> {
+        match self {
+            Self::Global(network) => network.activation_height(nu),
+            Self::Local(local) => local.activation_height(nu),
+        }
+    }
+}
+
+/// Selects the parameters for encoding the wallet's unified viewing keys and
+/// addresses.
+///
+/// A regtest wallet with a caller-supplied activation schedule is encoded with
+/// those local (regtest) parameters. Without a schedule there are no regtest
+/// parameters to consult, and the wallet falls through to the network-record
+/// mapping, which encodes regtest material as for the test network.
+fn address_encoding_params(
+    network_info: &NetworkInfo,
+    regtest_activations: Option<&RegtestActivations>,
+) -> AddressEncodingParams {
+    match (network_info.network(), regtest_activations) {
+        (Network::Regtest(_), Some(RegtestActivations::Local(local))) => {
+            AddressEncodingParams::Local(*local)
+        }
+        _ => AddressEncodingParams::Global(network_info.to_address_encoding_network()),
+    }
+}
+
 /// The network to record in the exported document.
 ///
 /// For a regtest wallet with a caller-supplied activation schedule, that
@@ -81,15 +131,17 @@ fn export_network(network: &Network, regtest_activations: Option<&RegtestActivat
 ///
 /// `regtest_activations` supplies the network-upgrade activation schedule when
 /// exporting a regtest wallet, which the `wallet.dat` does not record; see
-/// [`RegtestActivations`]. Pass `None` to export a regtest wallet without a
-/// schedule (an importer then trusts its own regtest parameters), or when
-/// exporting a mainnet or testnet wallet.
+/// [`RegtestActivations`]. The supplied parameters are also used to encode the
+/// wallet's unified viewing keys and addresses, giving them regtest HRPs. Pass
+/// `None` to export a regtest wallet without a schedule (an importer then
+/// trusts its own regtest parameters, and unified material is encoded as for
+/// the test network), or when exporting a mainnet or testnet wallet.
 pub fn migrate_to_zewif(
     wallet: &ZcashdWallet,
     export_height: BlockHeight,
     regtest_activations: Option<RegtestActivations>,
 ) -> Result<Zewif, MigrateError> {
-    let params = wallet.network_info().to_address_encoding_network();
+    let params = address_encoding_params(wallet.network_info(), regtest_activations.as_ref());
 
     let mut zewif = Zewif::new(export_height, best_block_hash(wallet));
 
@@ -160,6 +212,7 @@ fn set_account_birthdays(wallet: &ZcashdWallet, accounts: &mut WalletAccounts) {
 
 #[cfg(test)]
 mod tests {
+    use zcash_keys::keys::{UnifiedAddressRequest, UnifiedFullViewingKey, UnifiedSpendingKey};
     use zcash_protocol::consensus::BlockHeight as ConsensusBlockHeight;
 
     use super::*;
@@ -207,6 +260,59 @@ mod tests {
                 .get(&u32::from(BranchId::Nu6_2))
                 .is_none()
         );
+    }
+
+    fn regtest_network_info() -> NetworkInfo {
+        NetworkInfo::for_network(Network::Regtest(RegtestParams::default()))
+    }
+
+    /// A UFVK derived from a fixed seed, standing in for a wallet's unified
+    /// account key.
+    fn test_ufvk(params: &impl Parameters) -> UnifiedFullViewingKey {
+        UnifiedSpendingKey::from_seed(params, &[0u8; 32], zip32::AccountId::ZERO)
+            .expect("test seed derives a spending key")
+            .to_unified_full_viewing_key()
+    }
+
+    #[test]
+    fn regtest_wallet_with_activations_encodes_regtest_hrps() {
+        let activations = RegtestActivations::Local(distinct_local_network());
+        let params = address_encoding_params(&regtest_network_info(), Some(&activations));
+        assert_eq!(params.network_type(), NetworkType::Regtest);
+
+        // The same encodings `build_accounts` and `attach_addresses` emit must
+        // carry regtest HRPs, or an importer decoding against regtest
+        // parameters rejects them.
+        let ufvk = test_ufvk(&params);
+        let ufvk_str = ufvk.encode(&params);
+        assert!(
+            ufvk_str.starts_with("uviewregtest1"),
+            "expected a regtest UFVK encoding, got {ufvk_str}"
+        );
+        let (ua, _) = ufvk
+            .default_address(UnifiedAddressRequest::AllAvailableKeys)
+            .expect("the UFVK has a default address");
+        let ua_str = ua.encode(&params);
+        assert!(
+            ua_str.starts_with("uregtest1"),
+            "expected a regtest unified address encoding, got {ua_str}"
+        );
+    }
+
+    #[test]
+    fn regtest_wallet_without_activations_encodes_as_testnet() {
+        let params = address_encoding_params(&regtest_network_info(), None);
+        assert_eq!(params.network_type(), NetworkType::Test);
+    }
+
+    #[test]
+    fn mainnet_wallet_ignores_regtest_activations() {
+        let activations = RegtestActivations::Local(distinct_local_network());
+        let params = address_encoding_params(
+            &NetworkInfo::for_network(Network::Mainnet),
+            Some(&activations),
+        );
+        assert_eq!(params.network_type(), NetworkType::Main);
     }
 
     #[test]
