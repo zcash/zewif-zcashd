@@ -13,13 +13,16 @@
 //! / `z_exportkey`) before encryption, giving an independent (zcashd-side)
 //! oracle for the two spending keys checked below.
 
-use std::path::PathBuf;
+mod common;
 
+use common::require_fixture_dump;
 use zewif::BlockHeight;
 use zewif_zcashd::{
-    BDBDump, EncryptedKeyPolicy, Error, SecretVec, ZcashdDump, ZcashdParser, ZcashdWallet,
-    migrate_to_zewif,
+    EncryptedKeyPolicy, Error, SecretVec, ZcashdDump, ZcashdParser, ZcashdWallet, migrate_to_zewif,
 };
+
+const ENCRYPTED_FIXTURE: &str = "encrypted-regtest-wallet.dat";
+const PLAINTEXT_FIXTURE: &str = "plaintext-regtest-wallet.dat";
 
 const PASSPHRASE: &str = "test-passphrase-42";
 
@@ -31,21 +34,9 @@ const T_SCALAR_HEX: &str = "42c5ae019ceae4e57ae3013d1c72855af3ef950179178715537f
 // zregtestsapling1l5gx43wk23sg0da5u0xrzacaz0l67ppvhgt26sccnjtfvzev4dj0nyk8qspmrq0lpzn7y82t6ch.
 const Z_EXTSK_HEX: &str = "0494d0622e0000008095ce657732206728f9e413c1c87770dd83f187043c418d4c9ccbb5be14bf65b986ee8f9ab4eb591c88e8e148eaad09aaabeccc4a8a2a89d231cb00fb7d80710bcb61db3e4c7e6f4938fd2c191394942ac183aff21d08e81bceba874c2ba2450b0035322cbe40c65341cca4e7149913895d73ddb7fa8b72a13dee1722cd27e0918621346cd256cebbd5ac01431ab45591da04bddbc9276cb867a9e9a96a83ecbc";
 
-fn fixture(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures")
-        .join(name)
-}
-
-fn dump(name: &str) -> ZcashdDump {
-    let bdb = BDBDump::from_file(&fixture(name)).expect("db_dump the fixture");
-    ZcashdDump::from_bdb_dump(&bdb, false).expect("collect records")
-}
-
-/// Parse the encrypted fixture under the given policy.
-fn parse_encrypted(policy: EncryptedKeyPolicy) -> Result<ZcashdWallet, Error> {
-    ZcashdParser::parse_dump_with_policy(&dump("encrypted-regtest-wallet.dat"), false, policy)
-        .map(|(wallet, _)| wallet)
+/// Parse the encrypted fixture's dump under the given policy.
+fn parse_encrypted(dump: &ZcashdDump, policy: EncryptedKeyPolicy) -> Result<ZcashdWallet, Error> {
+    ZcashdParser::parse_dump_with_policy(dump, false, policy).map(|(wallet, _)| wallet)
 }
 
 /// A `Decrypt` policy for the given passphrase.
@@ -53,36 +44,18 @@ fn decrypt_with(passphrase: &str) -> EncryptedKeyPolicy {
     EncryptedKeyPolicy::Decrypt(SecretVec::new(passphrase.as_bytes().to_vec()))
 }
 
-fn parse_plaintext() -> ZcashdWallet {
-    ZcashdParser::parse_dump(&dump("plaintext-regtest-wallet.dat"), false)
+fn parse_plaintext(dump: &ZcashdDump) -> ZcashdWallet {
+    ZcashdParser::parse_dump(dump, false)
         .expect("plaintext wallet parses")
         .0
 }
 
-/// These tests shell out to `db_dump`, which `build.rs` only vendors on
-/// non-Windows platforms (elsewhere it must be on `PATH`). Where it is
-/// unavailable — notably Windows CI — reading a fixture fails with a
-/// `DbDumpExec` error; detect that and skip rather than fail.
-fn db_dump_available() -> bool {
-    BDBDump::from_file(&fixture("encrypted-regtest-wallet.dat")).is_ok()
-}
-
-/// Skip the current test (returning as a pass) when `db_dump` is unavailable.
-macro_rules! require_db_dump {
-    () => {
-        if !db_dump_available() {
-            eprintln!("skipping: db_dump is unavailable on this platform");
-            return;
-        }
-    };
-}
-
 #[test]
 fn decrypts_transparent_key_to_ground_truth() {
-    require_db_dump!();
+    let dump = require_fixture_dump!(ENCRYPTED_FIXTURE);
 
     let wallet =
-        parse_encrypted(decrypt_with(PASSPHRASE)).expect("decrypts with correct passphrase");
+        parse_encrypted(dump, decrypt_with(PASSPHRASE)).expect("decrypts with correct passphrase");
 
     let target = hex::decode(T_PUBKEY_HEX).unwrap();
     let keypair = wallet
@@ -101,10 +74,10 @@ fn decrypts_transparent_key_to_ground_truth() {
 
 #[test]
 fn decrypts_sapling_key_to_ground_truth() {
-    require_db_dump!();
+    let dump = require_fixture_dump!(ENCRYPTED_FIXTURE);
 
     let wallet =
-        parse_encrypted(decrypt_with(PASSPHRASE)).expect("decrypts with correct passphrase");
+        parse_encrypted(dump, decrypt_with(PASSPHRASE)).expect("decrypts with correct passphrase");
 
     let sapling_keys: Vec<_> = wallet.sapling_keys().keypairs().collect();
     assert_eq!(sapling_keys.len(), 1, "one legacy Sapling key");
@@ -123,16 +96,17 @@ fn decrypts_sapling_key_to_ground_truth() {
 /// address, and transaction at once, not just the two spot-checked above.
 #[test]
 fn encrypted_export_matches_plaintext_export() {
-    require_db_dump!();
+    let encrypted_dump = require_fixture_dump!(ENCRYPTED_FIXTURE);
+    let plaintext_dump = require_fixture_dump!(PLAINTEXT_FIXTURE);
 
     let height = BlockHeight::from_u32(2_000_000);
 
-    let plaintext = migrate_to_zewif(&parse_plaintext(), height, None)
+    let plaintext = migrate_to_zewif(&parse_plaintext(plaintext_dump), height, None)
         .expect("migrate plaintext")
         .to_bytes()
         .expect("serialize plaintext export");
     let decrypted = migrate_to_zewif(
-        &parse_encrypted(decrypt_with(PASSPHRASE)).expect("decrypts"),
+        &parse_encrypted(encrypted_dump, decrypt_with(PASSPHRASE)).expect("decrypts"),
         height,
         None,
     )
@@ -148,21 +122,22 @@ fn encrypted_export_matches_plaintext_export() {
 
 #[test]
 fn recovers_all_transparent_keys() {
-    require_db_dump!();
+    let encrypted_dump = require_fixture_dump!(ENCRYPTED_FIXTURE);
+    let plaintext_dump = require_fixture_dump!(PLAINTEXT_FIXTURE);
 
-    let wallet = parse_encrypted(decrypt_with(PASSPHRASE)).expect("decrypts");
+    let wallet = parse_encrypted(encrypted_dump, decrypt_with(PASSPHRASE)).expect("decrypts");
     // The plaintext and encrypted wallets carry the same key set.
     assert_eq!(
         wallet.keys().keypairs().count(),
-        parse_plaintext().keys().keypairs().count()
+        parse_plaintext(plaintext_dump).keys().keypairs().count()
     );
 }
 
 #[test]
 fn wrong_passphrase_is_rejected() {
-    require_db_dump!();
+    let dump = require_fixture_dump!(ENCRYPTED_FIXTURE);
 
-    match parse_encrypted(decrypt_with("the wrong passphrase")) {
+    match parse_encrypted(dump, decrypt_with("the wrong passphrase")) {
         Err(Error::WrongWalletPassphrase) => {}
         other => panic!("expected WrongWalletPassphrase, got {other:?}"),
     }
@@ -171,9 +146,9 @@ fn wrong_passphrase_is_rejected() {
 /// Reject mode (the default): an encrypted wallet is an error.
 #[test]
 fn reject_mode_reports_an_encrypted_wallet() {
-    require_db_dump!();
+    let dump = require_fixture_dump!(ENCRYPTED_FIXTURE);
 
-    match parse_encrypted(EncryptedKeyPolicy::Reject) {
+    match parse_encrypted(dump, EncryptedKeyPolicy::Reject) {
         Err(Error::EncryptedWalletRequiresPassphrase) => {}
         other => panic!("expected EncryptedWalletRequiresPassphrase, got {other:?}"),
     }
@@ -184,10 +159,10 @@ fn reject_mode_reports_an_encrypted_wallet() {
 /// encrypted key sets empty (in contrast to decrypt mode, which recovers them).
 #[test]
 fn skip_mode_omits_encrypted_keys() {
-    require_db_dump!();
+    let dump = require_fixture_dump!(ENCRYPTED_FIXTURE);
 
-    let wallet =
-        parse_encrypted(EncryptedKeyPolicy::Skip).expect("skip mode succeeds without a passphrase");
+    let wallet = parse_encrypted(dump, EncryptedKeyPolicy::Skip)
+        .expect("skip mode succeeds without a passphrase");
 
     assert_eq!(
         wallet.keys().keypairs().count(),
@@ -207,9 +182,9 @@ fn skip_mode_omits_encrypted_keys() {
 
 #[test]
 fn migrates_with_a_populated_secret_store() {
-    require_db_dump!();
+    let dump = require_fixture_dump!(ENCRYPTED_FIXTURE);
 
-    let wallet = parse_encrypted(decrypt_with(PASSPHRASE)).expect("decrypts");
+    let wallet = parse_encrypted(dump, decrypt_with(PASSPHRASE)).expect("decrypts");
     let zewif = migrate_to_zewif(&wallet, BlockHeight::from_u32(1), None).expect("migrates");
 
     let secrets = zewif

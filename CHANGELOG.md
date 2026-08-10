@@ -7,6 +7,50 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+### Added
+- Support for parsing pre-Sapling (HD-seedless) wallets, e.g. those created by
+  zcashd 1.x. Records that such wallets lack — the address book (`name` /
+  `purpose`), keypool (`pool`), `witnesscachesize`, transparent key records
+  (`key` / `keymeta`, for watch-only wallets), and the NU5-era
+  `orchard_note_commitment_tree` — now parse as empty rather than failing.
+  The leniency is bounded by the wallet's own `version` record: a wallet
+  last written by zcashd 5.0.0 or later must carry `networkinfo`,
+  `orchard_note_commitment_tree`, and transparent key records, and parsing
+  fails with the new `Error::MissingExpectedRecords` when such a record set
+  is absent, since that proves the file was stripped or corrupted. Below
+  that version a dump cannot distinguish a record that never existed from
+  one that was stripped, so callers expecting particular contents must
+  verify them on the parsed wallet. See the
+  `ZcashdParser::parse_dump_with_options` documentation.
+- `ZcashdParser::parse_dump_with_options` and `ParseOptions`, whose
+  `fallback_network` supplies the wallet's network when it predates the
+  `networkinfo` record (zcashd < 5.0.0). Without a `networkinfo` record or a
+  fallback network, parsing fails with the new `Error::MissingNetworkInfo`
+  instead of guessing the chain; for a 5.0.0+ wallet the missing record is
+  reported as `Error::MissingExpectedRecords` and the fallback is never
+  substituted.
+- `ZcashdDump::records_for_keyname_or_empty`, implementing the parser's
+  missing-records policy at the record-lookup layer.
+
+### Changed
+- `ZcashdWallet::witnesscachesize` now returns `Option<i64>`, as the record is
+  absent from wallets never touched by a witness-caching zcashd version.
+- A truncated `orchard_note_commitment_tree` record is now reported as a parse
+  error instead of causing a panic.
+- A key record set whose metadata record set is missing or of a different
+  size — `key` without `keymeta` or vice versa, and likewise the Sapling and
+  Sprout pairs — now fails with `Error::MismatchedKeyMetadata` instead of a
+  generic "keyname not found" error, as the asymmetry is evidence of a
+  stripped or hand-modified wallet.
+
+### Fixed
+- A regtest wallet's unified full viewing keys and unified addresses are now
+  encoded with regtest HRPs (`uviewregtest…`, `uregtest…`) when the caller
+  supplies `RegtestActivations` to `migrate_to_zewif`, instead of the testnet
+  HRPs that importers decoding against regtest parameters reject. Without
+  supplied activations they are still encoded as for the test network, matching
+  the wallet's transparent addresses.
+
 ## [0.1.0-rc.3] 2026-07-17
 
 ### Changed

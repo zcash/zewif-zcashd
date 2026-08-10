@@ -190,6 +190,23 @@ impl ZcashdDump {
         Ok(records)
     }
 
+    /// Like [`Self::records_for_keyname`], but a keyname entirely absent from
+    /// the dump yields an empty record set instead of an error.
+    ///
+    /// This implements the parser's missing-records policy (see
+    /// `ZcashdParser::parse_dump_with_options`) at the layer that owns record
+    /// lookup, so record parsers need no per-call-site absence guards. Use
+    /// [`Self::records_for_keyname`] when absence must fail.
+    pub fn records_for_keyname_or_empty(
+        &self,
+        keyname: &str,
+    ) -> Result<BTreeMap<DBKey, DBValue>, DumpError> {
+        if !self.has_keys_for_keyname(keyname) {
+            return Ok(BTreeMap::new());
+        }
+        self.records_for_keyname(keyname)
+    }
+
     pub fn has_keys_for_keyname(&self, keyname: &str) -> bool {
         self.keys_by_keyname.contains_key(keyname)
     }
