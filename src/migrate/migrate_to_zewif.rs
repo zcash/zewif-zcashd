@@ -230,8 +230,9 @@ mod tests {
             nu6: Some(ConsensusBlockHeight::from_u32(7)),
             nu6_1: Some(ConsensusBlockHeight::from_u32(8)),
             nu6_2: Some(ConsensusBlockHeight::from_u32(9)),
+            nu6_3: Some(ConsensusBlockHeight::from_u32(10)),
             #[cfg(zcash_unstable = "nu7")]
-            nu7: Some(ConsensusBlockHeight::from_u32(10)),
+            nu7: Some(ConsensusBlockHeight::from_u32(11)),
         }
     }
 
