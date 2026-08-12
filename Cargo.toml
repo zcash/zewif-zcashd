@@ -1,6 +1,6 @@
 [package]
 name = "zewif-zcashd"
-version = "0.1.0-rc.3"
+version = "0.1.0-rc.4"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
@@ -31,16 +31,16 @@ blake2b_simd = "1"
 # 0.6.20` and should not be updated unless `zcashd` updates its dependency
 # versions. This crate exists expressly for deserialization of `zcashd`
 # `wallet.dat` encoded data, so these must be kept in sync.
-zcash_address = "0.12"
+zcash_address = "0.13"
 zcash_encoding = "0.4"
-zcash_keys = { version = "0.14", features = ["transparent-inputs", "sapling", "orchard", "zcashd-compat"] }
-zcash_primitives = "0.28"
-zcash_protocol = { version = "0.9", features = ["local-consensus"] }
-zcash_transparent = { version = "0.8", features = ["transparent-inputs"] }
+zcash_keys = { version = "0.16.1", features = ["transparent-inputs", "sapling", "orchard", "zcashd-compat"] }
+zcash_primitives = "0.30"
+zcash_protocol = { version = "0.10", features = ["local-consensus"] }
+zcash_transparent = { version = "0.10", features = ["transparent-inputs"] }
 secp256k1 = "0.29"
 secrecy = "0.8"
 zip32 = "0.2"
-orchard = "0.14"
+orchard = "0.15"
 sapling = { package = "sapling-crypto", version = "0.7", features = ["temporary-zcashd"] }
 incrementalmerkletree = "0.8"
 bridgetree = "0.7"

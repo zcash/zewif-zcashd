@@ -7,6 +7,8 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+## [0.1.0-rc.4] - 2026-08-13
+
 ### Added
 - Support for parsing pre-Sapling (HD-seedless) wallets, e.g. those created by
   zcashd 1.x. Records that such wallets lack — the address book (`name` /
@@ -33,6 +35,13 @@ and this library adheres to Rust's notion of
   missing-records policy at the record-lookup layer.
 
 ### Changed
+- Bumped dependency stack to the `zcash_protocol 0.10` cohort:
+  `zcash_protocol` 0.9 → 0.10, `zcash_address` 0.12 → 0.13,
+  `zcash_keys` 0.14 → 0.16.1, `zcash_primitives` 0.28 → 0.30,
+  `zcash_transparent` 0.8 → 0.10, `orchard` 0.14 → 0.15. The wallet.dat
+  binary format is unaffected; these bumps align the crate with the current
+  librustzcash release cohort and eliminate the need for downstream
+  consumers to maintain a versioned `zcash_protocol` alias.
 - `ZcashdWallet::witnesscachesize` now returns `Option<i64>`, as the record is
   absent from wallets never touched by a witness-caching zcashd version.
 - A truncated `orchard_note_commitment_tree` record is now reported as a parse
