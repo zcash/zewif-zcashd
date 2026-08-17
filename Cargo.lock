@@ -1347,6 +1347,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "secrecy"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
+dependencies = [
+ "zeroize",
+]
+
+[[package]]
 name = "semver"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1813,7 +1822,7 @@ dependencies = [
  "rand_core",
  "regex",
  "sapling-crypto",
- "secrecy",
+ "secrecy 0.8.0",
  "subtle",
  "tracing",
  "zcash_address",
@@ -2000,7 +2009,7 @@ dependencies = [
  "ripemd 0.1.3",
  "sapling-crypto",
  "secp256k1",
- "secrecy",
+ "secrecy 0.10.3",
  "sha2 0.10.9",
  "thiserror 2.0.18",
  "uuid",
