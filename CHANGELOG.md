@@ -7,6 +7,14 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+## [0.1.0-rc.5] - 2026-08-17
+
+### Fixed
+- `regtest_params_from_local` now includes NU6.3 (Ironwood) in the regtest
+  activation schedule. Previously it mapped only through NU6.2, causing
+  transactions mined under NU6.3 to fail with "Consensus branch ID not known"
+  during wallet import.
+
 ## [0.1.0-rc.4] - 2026-08-13
 
 ### Added

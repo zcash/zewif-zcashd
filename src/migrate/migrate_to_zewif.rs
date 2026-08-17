@@ -46,6 +46,7 @@ fn regtest_params_from_local(local: &LocalNetwork) -> RegtestParams {
         (local.nu6, BranchId::Nu6),
         (local.nu6_1, BranchId::Nu6_1),
         (local.nu6_2, BranchId::Nu6_2),
+        (local.nu6_3, BranchId::Nu6_3),
     ] {
         if let Some(height) = height {
             activations.insert(u32::from(branch_id), u32::from(height));
@@ -247,6 +248,10 @@ mod tests {
         assert_eq!(
             params.activations().get(&u32::from(BranchId::Nu6_2)),
             Some(&9)
+        );
+        assert_eq!(
+            params.activations().get(&u32::from(BranchId::Nu6_3)),
+            Some(&10)
         );
     }
 
