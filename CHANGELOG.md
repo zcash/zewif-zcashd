@@ -28,6 +28,20 @@ and this library adheres to Rust's notion of
 - `regtest_params_from_local` now always includes the NU7 activation height. It
   was previously included only when built with `--cfg zcash_unstable="nu7"`,
   which `zcash_protocol` 0.11 no longer requires.
+- `migrate_to_zewif` now exports each legacy Sapling spending key as its own
+  account, keyed by the key's extended full viewing key, with provenance
+  `zcashd_legacy` and (where the key's metadata records one) its seed
+  derivation. Keys that duplicate the Sapling component of a stored UFVK
+  (unified account receiver keys, which zcashd also stores in the Sapling
+  keystore) are identified by their diversifiable full viewing keys and
+  skipped. Previously legacy Sapling keys traveled only in the secret store,
+  so a viewing-only importer had no account under which to represent them.
+- `migrate_to_zewif` attaches each Sapling address and received note to the
+  account whose Sapling viewing key views it: a legacy Sapling key's account,
+  or the unified account whose Sapling receiver it is, with the matching key
+  scope. Sapling addresses of view-only keys remain on the synthesized legacy
+  account, now with scope `Foreign`. Previously all Sapling addresses and
+  notes were attached to the synthesized legacy account.
 
 ## [0.1.0-rc.5] - 2026-08-17
 

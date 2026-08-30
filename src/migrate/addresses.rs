@@ -27,8 +27,11 @@ use crate::{
 };
 
 /// Attach every address recoverable from the wallet to the appropriate
-/// account: unified addresses to their unified account, and all transparent,
-/// legacy Sapling, and Sprout addresses to the synthesized legacy account.
+/// account: unified addresses to their unified account, Sapling addresses to
+/// the account whose Sapling viewing key views them (a legacy Sapling key's
+/// account, or the unified account whose Sapling receiver they are), with
+/// view-only Sapling addresses on the synthesized legacy account, and all
+/// transparent and Sprout addresses to the synthesized legacy account.
 pub(crate) fn attach_addresses(
     wallet: &ZcashdWallet,
     accounts: &mut WalletAccounts,
@@ -178,13 +181,22 @@ fn transparent_spend_info(keypair: &KeyPair) -> (TransparentSpendAuthority, KeyS
 
 fn attach_sapling_addresses(wallet: &ZcashdWallet, accounts: &mut WalletAccounts) -> Result<(), MigrateError> {
     let network = wallet.network();
-    let legacy_index = accounts.legacy_index;
+    // Route each address to the account whose Sapling viewing key views it,
+    // with that key's scope. Addresses of keys without an account (view-only
+    // imports) fall back to the legacy account as foreign material.
+    let route = |ivk: &zewif::sapling::SaplingIncomingViewingKey| -> (usize, KeyScope) {
+        accounts
+            .sapling_routes
+            .get(ivk)
+            .copied()
+            .unwrap_or((accounts.legacy_index, KeyScope::Foreign))
+    };
     let mut emitted: HashSet<zewif::sapling::SaplingIncomingViewingKey> = HashSet::new();
 
-    // Collect (address string, protocol address, scope) and emit sorted by
-    // address, so the migrated wallet is reproducible across runs (the source
-    // maps have no stable iteration order).
-    let mut collected: Vec<(String, zewif::sapling::Address, KeyScope)> = Vec::new();
+    // Collect (address string, protocol address, scope, account) and emit
+    // sorted by address, so the migrated wallet is reproducible across runs
+    // (the source maps have no stable iteration order).
+    let mut collected: Vec<(String, zewif::sapling::Address, KeyScope, usize)> = Vec::new();
 
     // Spend-capable and view-only-with-default-address Sapling addresses have a
     // `sapzaddr` record.
@@ -194,7 +206,8 @@ fn attach_sapling_addresses(wallet: &ZcashdWallet, accounts: &mut WalletAccounts
         // part of the address encoding itself, not the ZIP 32 diversifier
         // index; legacy zcashd records no index, so none is set here.
         let sapling_addr = zewif::sapling::Address::new(addr_str.clone());
-        collected.push((addr_str, sapling_addr, KeyScope::External));
+        let (target, scope) = route(ivk);
+        collected.push((addr_str, sapling_addr, scope, target));
         emitted.insert(*ivk);
     }
 
@@ -210,19 +223,15 @@ fn attach_sapling_addresses(wallet: &ZcashdWallet, accounts: &mut WalletAccounts
             payment_address.to_bytes(),
         )
         .to_string();
-        // Imported view-only key material not derived from account keys.
-        collected.push((
-            addr_str.clone(),
-            zewif::sapling::Address::new(addr_str),
-            KeyScope::Foreign,
-        ));
+        let (target, scope) = route(ivk);
+        collected.push((addr_str.clone(), zewif::sapling::Address::new(addr_str), scope, target));
     }
 
-    collected.sort_by(|(a, _, _), (b, _, _)| a.cmp(b));
-    for (_, sapling_addr, scope) in collected {
+    collected.sort_by(|(a, _, _, _), (b, _, _, _)| a.cmp(b));
+    for (_, sapling_addr, scope, target) in collected {
         let mut address = Address::new(ProtocolAddress::Sapling(Box::new(sapling_addr)));
         address.set_scope(scope);
-        accounts.accounts[legacy_index].add_address(address);
+        accounts.accounts[target].add_address(address);
     }
 
     Ok(())
