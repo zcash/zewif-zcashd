@@ -28,8 +28,10 @@ use crate::{
 };
 
 /// Attach every address recoverable from the wallet to the appropriate
-/// account: unified addresses to their unified account, and all transparent,
-/// legacy Sapling, and Sprout addresses to the synthesized legacy account.
+/// account: unified addresses to their unified account, legacy Sapling
+/// addresses to their spending key's account (view-only Sapling addresses to
+/// the synthesized legacy account), and all transparent and Sprout addresses
+/// to the synthesized legacy account.
 pub(crate) fn attach_addresses(
     wallet: &ZcashdWallet,
     accounts: &mut WalletAccounts,
@@ -175,12 +177,20 @@ fn p2pkh_address_string(pk: &PublicKey, network: &Network) -> String {
 fn attach_sapling_addresses(wallet: &ZcashdWallet, accounts: &mut WalletAccounts) -> Result<(), MigrateError> {
     let network = wallet.network();
     let legacy_index = accounts.legacy_index;
+    // Route each address to the account of the Sapling key that views it;
+    // addresses of keys without an account (view-only imports) fall back to
+    // the legacy account.
+    let sapling_routes: HashMap<zewif::sapling::SaplingIncomingViewingKey, usize> = accounts
+        .sapling
+        .iter()
+        .map(|(idx, ivk)| (*ivk, *idx))
+        .collect();
     let mut emitted: HashSet<zewif::sapling::SaplingIncomingViewingKey> = HashSet::new();
 
-    // Collect (address string, protocol address, scope) and emit sorted by
-    // address, so the migrated wallet is reproducible across runs (the source
-    // maps have no stable iteration order).
-    let mut collected: Vec<(String, zewif::sapling::Address, KeyScope)> = Vec::new();
+    // Collect (address string, protocol address, scope, account) and emit
+    // sorted by address, so the migrated wallet is reproducible across runs
+    // (the source maps have no stable iteration order).
+    let mut collected: Vec<(String, zewif::sapling::Address, KeyScope, usize)> = Vec::new();
 
     // Spend-capable and view-only-with-default-address Sapling addresses have a
     // `sapzaddr` record.
@@ -190,7 +200,8 @@ fn attach_sapling_addresses(wallet: &ZcashdWallet, accounts: &mut WalletAccounts
         // part of the address encoding itself, not the ZIP 32 diversifier
         // index; legacy zcashd records no index, so none is set here.
         let sapling_addr = zewif::sapling::Address::new(addr_str.clone());
-        collected.push((addr_str, sapling_addr, KeyScope::External));
+        let target = sapling_routes.get(ivk).copied().unwrap_or(legacy_index);
+        collected.push((addr_str, sapling_addr, KeyScope::External, target));
         emitted.insert(*ivk);
     }
 
@@ -211,14 +222,15 @@ fn attach_sapling_addresses(wallet: &ZcashdWallet, accounts: &mut WalletAccounts
             addr_str.clone(),
             zewif::sapling::Address::new(addr_str),
             KeyScope::Foreign,
+            legacy_index,
         ));
     }
 
-    collected.sort_by(|(a, _, _), (b, _, _)| a.cmp(b));
-    for (_, sapling_addr, scope) in collected {
+    collected.sort_by(|(a, _, _, _), (b, _, _, _)| a.cmp(b));
+    for (_, sapling_addr, scope, target) in collected {
         let mut address = Address::new(ProtocolAddress::Sapling(Box::new(sapling_addr)));
         address.set_scope(scope);
-        accounts.accounts[legacy_index].add_address(address);
+        accounts.accounts[target].add_address(address);
     }
 
     Ok(())

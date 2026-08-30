@@ -20,11 +20,11 @@ use crate::{
 /// Attach the wallet's received shielded outputs to the accounts that can view
 /// them.
 ///
-/// Sapling and Sprout notes are all attributed to the synthesized legacy
-/// account (standalone shielded addresses in zcashd belong to its legacy
-/// pool). Orchard notes are routed to the unified account whose incoming
-/// viewing key matches the action's, falling back to the legacy account when
-/// no account matches.
+/// Sapling notes are routed to the legacy Sapling account whose incoming
+/// viewing key matches the note's, and Orchard notes to the unified account
+/// whose incoming viewing key matches the action's; both fall back to the
+/// synthesized legacy account when no account matches. Sprout notes are all
+/// attributed to the legacy account.
 ///
 /// Note commitment positions are recorded as [`CommitmentTreeData::Position`].
 /// Full incremental witnesses are not reconstructed: zcashd's parsed witness
@@ -46,11 +46,20 @@ pub(crate) fn attach_received_outputs(
 
     let orchard_routes = orchard_ivk_routes(accounts);
     let orchard_positions = orchard_note_positions(wallet);
+    let sapling_routes: HashMap<zewif::sapling::SaplingIncomingViewingKey, usize> = accounts
+        .sapling
+        .iter()
+        .map(|(idx, ivk)| (*ivk, *idx))
+        .collect();
 
     for (txid, wtx) in wallet.transactions() {
-        // Sapling notes -> legacy account.
+        // Sapling notes -> the note's key account (else legacy).
         if let Some(note_data) = wtx.sapling_note_data() {
             for (outpoint, nd) in note_data {
+                let account_index = sapling_routes
+                    .get(nd.incoming_viewing_key())
+                    .copied()
+                    .unwrap_or(legacy_index);
                 let tree_data = sapling_note_position(nd)
                     .map(|p| CommitmentTreeData::Position(TreePosition::new(p)));
                 let nullifier = nd.nullifier().map(|n| zewif::Nullifier::new(*n));
@@ -59,7 +68,7 @@ pub(crate) fn attach_received_outputs(
                     ReceivedOutputPool::Sapling(SaplingOutputData::new(tree_data, nullifier)),
                 );
                 by_account
-                    .entry(legacy_index)
+                    .entry(account_index)
                     .or_default()
                     .entry(outpoint.txid())
                     .or_default()

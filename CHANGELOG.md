@@ -7,6 +7,18 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+### Changed
+- `migrate_to_zewif` now exports each legacy Sapling spending key as its own
+  account, keyed by the key's extended full viewing key, with provenance
+  `zcashd_legacy` and (where the key's metadata records one) its seed
+  derivation. Sapling addresses and received notes are attached to their key's
+  account instead of the synthesized legacy account; keys that duplicate a
+  unified account's Sapling viewing capability (its receiver keys, which
+  zcashd also stores in the Sapling keystore) are identified by their
+  diversifiable full viewing keys and skipped. Previously legacy Sapling
+  keys traveled only in the secret store, so a viewing-only importer had no
+  account under which to represent them.
+
 ## [0.1.0-rc.5] - 2026-08-17
 
 ### Fixed

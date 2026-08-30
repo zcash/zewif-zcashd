@@ -34,6 +34,11 @@ blake2b_simd = "1"
 zcash_address = "0.13"
 zcash_encoding = "0.4"
 zcash_keys = { version = "0.16.1", features = ["transparent-inputs", "sapling", "orchard", "zcashd-compat"] }
+# Not used directly: zcash_keys 0.16.1 builds `regex` without the
+# `unicode-perl` feature its `zcashd` HD-keypath parser needs, so
+# `parse_hd_path` panics unless another crate in the graph enables it.
+# This entry supplies the feature via unification.
+regex = { version = "1.11", default-features = false, features = ["std", "unicode-perl"] }
 zcash_primitives = "0.30"
 zcash_protocol = { version = "0.10", features = ["local-consensus"] }
 zcash_transparent = { version = "0.10", features = ["transparent-inputs"] }
