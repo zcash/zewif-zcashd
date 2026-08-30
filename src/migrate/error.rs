@@ -46,6 +46,15 @@ pub enum MigrateError {
     #[error("legacy HD seed has an invalid length for ZIP 32 fingerprinting")]
     InvalidLegacySeedLength,
 
+    /// The wallet's recorded BIP-39 mnemonic phrase failed to parse.
+    #[error("the wallet's recorded BIP-39 mnemonic phrase is invalid")]
+    InvalidMnemonic,
+
+    /// Deriving the legacy account's unified spending key from the mnemonic
+    /// seed failed.
+    #[error("deriving the legacy account from the mnemonic seed: {0}")]
+    LegacyAccountDerivation(#[source] zcash_keys::keys::DerivationError),
+
     /// Converting a single wallet transaction failed.
     #[error("converting transaction {txid}: {source}")]
     TransactionConversion {

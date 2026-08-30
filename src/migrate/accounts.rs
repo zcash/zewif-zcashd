@@ -11,7 +11,7 @@ use zewif::{
 use crate::migrate::MigrateError;
 use crate::{
     ZcashdWallet,
-    migrate::secrets::{legacy_mnemonic_seed, mnemonic_seed_fingerprint, sapling_hrps},
+    migrate::secrets::{legacy_account_seed, sapling_hrps},
     zcashd_wallet::{UfvkFingerprint, encode_seed_fingerprint},
 };
 
@@ -105,16 +105,45 @@ pub(crate) fn build_accounts(
     // viewing-only import can represent it; the spending half lives in the
     // secret store.
     //
-    // Keys that duplicate viewing capability a unified account already
-    // carries are skipped: zcashd stores a unified account's Sapling receiver
-    // key in the Sapling keystore alongside standalone keys, and its metadata
-    // does not reliably record the derivation, so such keys are identified by
-    // their material — the diversifiable full viewing key — rather than by
-    // metadata. Importing one as its own account would collide with the
-    // unified account's Sapling component.
+    // The legacy account's viewing key. zcashd reserves ZIP 32 account
+    // 0x7FFFFFFF, derived from the post-v4.7.0 mnemonic seed, as the pool for
+    // its legacy material: pre-v4.7.0 transparent addresses derived from
+    // system randomness, and post-v4.7.0 `getnewaddress` /` z_getnewaddress`
+    // keys derived under that account. Where the mnemonic (or, for a
+    // pre-mnemonic wallet, the mnemonic zcashd's upgrade would derive from
+    // its legacy HD seed) is recoverable, the account's full viewing key is
+    // derived from it here, so that the account imports from that location
+    // like any other seed-derived account — including into viewing-only
+    // wallets. A wallet with no seed material at all falls back to a bare
+    // transparent address set.
+    let legacy_account_key = match legacy_account_seed(wallet)? {
+        Some((seed, fp)) => {
+            use secrecy::ExposeSecret;
+            let usk = zcash_keys::keys::UnifiedSpendingKey::from_seed(
+                params,
+                seed.expose_secret(),
+                zip32::AccountId::try_from(ZCASHD_LEGACY_ACCOUNT)
+                    .expect("0x7FFFFFFF is a valid ZIP 32 account identifier"),
+            )
+            .map_err(MigrateError::LegacyAccountDerivation)?;
+            Some((usk.to_unified_full_viewing_key(), fp))
+        }
+        None => None,
+    };
+
+    // Keys that duplicate viewing capability a unified account (or the
+    // legacy account) already carries are skipped: zcashd stores a unified
+    // account's Sapling receiver key in the Sapling keystore alongside
+    // standalone keys, and its metadata does not reliably record the
+    // derivation, so such keys are identified by their material — the
+    // diversifiable full viewing key — rather than by metadata. Importing one
+    // as its own account would collide with the covering account's Sapling
+    // component.
     let unified_sapling_dfvks: std::collections::HashSet<[u8; 128]> = unified
         .iter()
-        .filter_map(|(_, ufvk)| ufvk.sapling().map(|dfvk| dfvk.to_bytes()))
+        .map(|(_, ufvk)| ufvk)
+        .chain(legacy_account_key.iter().map(|(ufvk, _)| ufvk))
+        .filter_map(|ufvk| ufvk.sapling().map(|dfvk| dfvk.to_bytes()))
         .collect();
     let (_, extfvk_hrp) = sapling_hrps(wallet.network());
     let network_type = params.network_type();
@@ -157,28 +186,19 @@ pub(crate) fn build_accounts(
     }
 
     // The synthesized legacy account: a hybrid pool holding transparent,
-    // legacy Sapling, and Sprout addresses (zcashd account 0x7FFFFFFF).
-    let mut legacy = Account::new(AccountViewingKey::TransparentAddressSet);
-    legacy.set_name("Legacy");
-    // zcashd derives the keys of account index 0x7FFFFFFF from the mnemonic
-    // seed: post-v4.7.0 `getnewaddress` transparent keys
-    // (m/44'/coin'/0x7FFFFFFF'/change/index) and post-v4.7.0 `z_getnewaddress`
-    // Sapling keys (m/32'/coin'/0x7FFFFFFF'/idx'). A v4.7.0+ wallet records that
-    // mnemonic directly. A pre-mnemonic wallet records none, but if it carries a
-    // legacy HD seed then zcashd's own upgrade would re-derive the mnemonic from
-    // it; reproducing that (`legacy_mnemonic_seed`) lets the legacy account —
-    // and the imported transparent addresses attached to it — import as a
-    // seed-derived account. A wallet with neither a mnemonic nor a legacy seed
-    // (a bare set of imported addresses) has no derivation root, so its legacy
-    // account remains a bag of imported material.
-    let legacy_seed_fp = match mnemonic_seed_fingerprint(wallet) {
-        Some(fp) => Some(fp),
-        None => legacy_mnemonic_seed(wallet)?.map(|(_, fp)| fp),
+    // legacy Sapling, and Sprout addresses (zcashd account 0x7FFFFFFF; see
+    // `legacy_account_key` above for its derivation).
+    let mut legacy = match &legacy_account_key {
+        Some((ufvk, _)) => Account::new(AccountViewingKey::Ufvk(
+            zewif::UnifiedFullViewingKey::new(ufvk.encode(params)),
+        )),
+        None => Account::new(AccountViewingKey::TransparentAddressSet),
     };
-    match legacy_seed_fp {
-        Some(seed_fp) => {
+    legacy.set_name("Legacy");
+    match &legacy_account_key {
+        Some((_, seed_fp)) => {
             legacy.set_key_source(KeySource::Derived(DerivedKeySource::new(
-                seed_fp,
+                seed_fp.clone(),
                 ZCASHD_LEGACY_ACCOUNT,
                 None,
             )));

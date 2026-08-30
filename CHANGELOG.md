@@ -18,6 +18,15 @@ and this library adheres to Rust's notion of
   diversifiable full viewing keys and skipped. Previously legacy Sapling
   keys traveled only in the secret store, so a viewing-only importer had no
   account under which to represent them.
+- The synthesized legacy account now carries the unified full viewing key
+  derived from the post-v4.7.0 mnemonic seed at ZIP 32 account `0x7FFFFFFF`
+  (the identifier zcashd reserves for legacy transparent addresses derived
+  from system randomness), where the mnemonic — or, for a pre-mnemonic
+  wallet, the mnemonic zcashd's upgrade would derive from its legacy HD
+  seed — is recoverable. The account therefore imports from that location
+  like any other seed-derived account, including into viewing-only wallets.
+  A wallet with no seed material at all still exports it as a bare
+  transparent address set.
 
 ## [0.1.0-rc.5] - 2026-08-17
 
