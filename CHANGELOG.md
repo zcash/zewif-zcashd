@@ -59,6 +59,10 @@ and this library adheres to Rust's notion of
   when its language has no BIP-39 wordlist, or when the wallet's mnemonic HD
   chain record stores a different fingerprint. Previously the fingerprint was
   read from the mnemonic HD chain record without a check.
+- Transparent addresses now carry their public keys whenever the wallet
+  holds them, not only for watch-only imports. The public key is the
+  transparent key's viewing half; a viewing-only import (which strips the
+  secret store) needs it to register the address for watching.
 
 ## [0.1.0-rc.5] - 2026-08-17
 

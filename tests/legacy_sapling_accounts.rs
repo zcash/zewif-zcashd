@@ -134,3 +134,43 @@ fn legacy_sapling_key_becomes_its_own_account() {
     .encode(&params);
     assert_eq!(legacy_ufvk.encoding(), &expected);
 }
+
+/// Every transparent address whose key the wallet holds carries its public
+/// key — the key's viewing half — so a viewing-only import (which strips the
+/// secret store) can register the address for watching.
+#[test]
+fn transparent_addresses_carry_pubkeys() {
+    let dump = require_fixture_dump!(PLAINTEXT_FIXTURE);
+    let wallet = ZcashdParser::parse_dump(dump, false)
+        .expect("plaintext wallet parses")
+        .0;
+    let zewif = migrate_to_zewif(&wallet, BlockHeight::from_u32(1), None).expect("migrates");
+
+    // The ground-truth spendable key from `encrypted_wallet.rs`.
+    const T_PUBKEY_HEX: &str = "03fbcb678f47782926e8a23e01e7aacd52ae10666c97d5df317274aeb4ae5373db";
+
+    let mut spendable_with_pubkey = 0;
+    let mut ground_truth_seen = false;
+    for wallet in zewif.wallets() {
+        for account in wallet.accounts() {
+            for address in account.addresses() {
+                if let ProtocolAddress::Transparent(t) = address.address()
+                    && t.spend_authority().is_some()
+                {
+                    let pubkey = t
+                        .pubkey()
+                        .expect("spendable transparent addresses carry their pubkeys");
+                    spendable_with_pubkey += 1;
+                    if hex::encode(pubkey.as_slice()) == T_PUBKEY_HEX {
+                        ground_truth_seen = true;
+                    }
+                }
+            }
+        }
+    }
+    assert!(spendable_with_pubkey > 0, "spendable addresses are present");
+    assert!(
+        ground_truth_seen,
+        "the known key's pubkey rides on its address"
+    );
+}
