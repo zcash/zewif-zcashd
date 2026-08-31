@@ -32,6 +32,13 @@ and this library adheres to Rust's notion of
   transparent key's viewing half; a viewing-only import (which strips the
   secret store) needs it to register the address for watching.
 
+### Fixed
+- The legacy HD seed of an unencrypted wallet is now parsed. The `hdseed`
+  record is keyed by the seed's fingerprint, but it was looked up as a
+  keyname-only singleton, which never matches; every unencrypted wallet
+  therefore reported its legacy HD seed as absent, and exports omitted the
+  seed from the secret store. Encrypted wallets (`chdseed`) were unaffected.
+
 ## [0.1.0-rc.5] - 2026-08-17
 
 ### Fixed
