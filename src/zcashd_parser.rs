@@ -794,7 +794,10 @@ impl<'a> ZcashdParser<'a> {
     }
 
     fn parse_hdseed(&self, master_key: Option<&[u8; 32]>) -> Result<Option<LegacySeed>, Error> {
-        if self.dump.has_value_for_keyname("hdseed") {
+        // The `hdseed` record is keyed by the seed's fingerprint, so it must
+        // be discovered through the keyname index; a keyname-only value
+        // lookup (`has_value_for_keyname`) never matches it.
+        if self.dump.has_keys_for_keyname("hdseed") {
             let (key, value) = self
                 .dump
                 .record_for_keyname("hdseed")?;
@@ -1342,6 +1345,35 @@ mod tests {
             data_records: records.into_iter().collect(),
         };
         ZcashdDump::from_bdb_dump(&bdb, true).expect("from_bdb_dump")
+    }
+
+    /// Regression: the `hdseed` record is keyed by the seed's fingerprint,
+    /// not by the bare keyname. It was previously looked up as a
+    /// keyname-only singleton, which never matches, silently dropping the
+    /// legacy HD seed of every unencrypted pre-v4.7.0 wallet.
+    #[test]
+    fn fingerprint_keyed_hdseed_is_parsed() {
+        let seed = [0xA5u8; 32];
+        let fingerprint = [0xBBu8; 32];
+        // The record value is the seed as a length-prefixed byte vector.
+        let mut value = Vec::with_capacity(33);
+        value.push(32);
+        value.extend_from_slice(&seed);
+        let dump = dump_with_records(vec![(
+            make_bdb_key("hdseed", &fingerprint),
+            Data::from_slice(&value),
+        )]);
+
+        let parser = ZcashdParser::new(&dump, ParseOptions::new());
+        let parsed = parser
+            .parse_hdseed(None)
+            .expect("parses")
+            .expect("the legacy HD seed is present");
+        assert_eq!(parsed.as_slice(), &seed);
+        assert!(
+            parser.unparsed_keys.borrow().is_empty(),
+            "the hdseed record is accounted as parsed"
+        );
     }
 
     /// A client version predating the zcashd 5.0.0 record requirements.
