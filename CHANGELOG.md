@@ -7,6 +7,38 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+### Changed
+- `migrate_to_zewif` now exports each legacy Sapling spending key as its own
+  account, keyed by the key's extended full viewing key, with provenance
+  `zcashd_legacy` and (where the key's metadata records one) its seed
+  derivation. Sapling addresses and received notes are attached to their key's
+  account instead of the synthesized legacy account; keys that duplicate a
+  unified account's Sapling viewing capability (its receiver keys, which
+  zcashd also stores in the Sapling keystore) are identified by their
+  diversifiable full viewing keys and skipped. Previously legacy Sapling
+  keys traveled only in the secret store, so a viewing-only importer had no
+  account under which to represent them.
+- The synthesized legacy account now carries the unified full viewing key
+  derived from the post-v4.7.0 mnemonic seed at ZIP 32 account `0x7FFFFFFF`
+  (the identifier zcashd reserves for legacy transparent addresses derived
+  from system randomness), where the mnemonic — or, for a pre-mnemonic
+  wallet, the mnemonic zcashd's upgrade would derive from its legacy HD
+  seed — is recoverable. The account therefore imports from that location
+  like any other seed-derived account, including into viewing-only wallets.
+  A wallet with no seed material at all still exports it as a bare
+  transparent address set.
+- Transparent addresses now carry their public keys whenever the wallet
+  holds them, not only for watch-only imports. The public key is the
+  transparent key's viewing half; a viewing-only import (which strips the
+  secret store) needs it to register the address for watching.
+
+### Fixed
+- The legacy HD seed of an unencrypted wallet is now parsed. The `hdseed`
+  record is keyed by the seed's fingerprint, but it was looked up as a
+  keyname-only singleton, which never matches; every unencrypted wallet
+  therefore reported its legacy HD seed as absent, and exports omitted the
+  seed from the secret store. Encrypted wallets (`chdseed`) were unaffected.
+
 ## [0.1.0-rc.5] - 2026-08-17
 
 ### Fixed

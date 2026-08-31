@@ -28,8 +28,10 @@ use crate::{
 };
 
 /// Attach every address recoverable from the wallet to the appropriate
-/// account: unified addresses to their unified account, and all transparent,
-/// legacy Sapling, and Sprout addresses to the synthesized legacy account.
+/// account: unified addresses to their unified account, legacy Sapling
+/// addresses to their spending key's account (view-only Sapling addresses to
+/// the synthesized legacy account), and all transparent and Sprout addresses
+/// to the synthesized legacy account.
 pub(crate) fn attach_addresses(
     wallet: &ZcashdWallet,
     accounts: &mut WalletAccounts,
@@ -63,7 +65,10 @@ fn attach_transparent_addresses(
     // The key database: every keypair (including reserved keypool keys, whose
     // public keys live here) yields a P2PKH address. HD-derived keys carry
     // their derivation; independently generated / imported keys are marked
-    // `Imported` with the private key held in the secret store.
+    // `Imported` with the private key held in the secret store. The public
+    // key is recorded alongside either way: it is the transparent key's
+    // viewing half, and a viewing-only import (which strips the secret
+    // store) needs it to register the address for watching.
     for keypair in wallet.keys().keypairs() {
         let pk = PublicKey::from_slice(keypair.pubkey().as_slice())
             .map_err(MigrateError::InvalidPublicKey)?;
@@ -72,6 +77,14 @@ fn attach_transparent_addresses(
         let entry = entries.entry(addr_str).or_default();
         entry.spend_authority.get_or_insert(authority);
         entry.scope.get_or_insert(scope);
+        match zewif::transparent::TransparentPubKey::from_bytes(
+            keypair.pubkey().as_slice().to_vec(),
+        ) {
+            Ok(pubkey) => {
+                entry.pubkey.get_or_insert(pubkey);
+            }
+            Err(e) => eprintln!("warning: transparent public key dropped: {e}"),
+        }
     }
 
     // Watch-only imports (`importaddress` / `importpubkey`). P2PK entries carry
@@ -134,11 +147,10 @@ fn attach_transparent_addresses(
         if let Some(authority) = info.spend_authority {
             t_addr.set_spend_authority(authority);
         }
-        // A watch-only public key is only carried when there is no spend
-        // authority (otherwise it is derivable from the private key).
-        if t_addr.spend_authority().is_none()
-            && let Some(pubkey) = info.pubkey
-        {
+        // The public key is carried whenever it is known — including for
+        // spendable keys, whose private halves travel only in the secret
+        // store and are absent from a viewing-only export.
+        if let Some(pubkey) = info.pubkey {
             t_addr.set_pubkey(pubkey);
         }
         if let Some(redeem_script) = info.redeem_script {
@@ -175,12 +187,20 @@ fn p2pkh_address_string(pk: &PublicKey, network: &Network) -> String {
 fn attach_sapling_addresses(wallet: &ZcashdWallet, accounts: &mut WalletAccounts) -> Result<(), MigrateError> {
     let network = wallet.network();
     let legacy_index = accounts.legacy_index;
+    // Route each address to the account of the Sapling key that views it;
+    // addresses of keys without an account (view-only imports) fall back to
+    // the legacy account.
+    let sapling_routes: HashMap<zewif::sapling::SaplingIncomingViewingKey, usize> = accounts
+        .sapling
+        .iter()
+        .map(|(idx, ivk)| (*ivk, *idx))
+        .collect();
     let mut emitted: HashSet<zewif::sapling::SaplingIncomingViewingKey> = HashSet::new();
 
-    // Collect (address string, protocol address, scope) and emit sorted by
-    // address, so the migrated wallet is reproducible across runs (the source
-    // maps have no stable iteration order).
-    let mut collected: Vec<(String, zewif::sapling::Address, KeyScope)> = Vec::new();
+    // Collect (address string, protocol address, scope, account) and emit
+    // sorted by address, so the migrated wallet is reproducible across runs
+    // (the source maps have no stable iteration order).
+    let mut collected: Vec<(String, zewif::sapling::Address, KeyScope, usize)> = Vec::new();
 
     // Spend-capable and view-only-with-default-address Sapling addresses have a
     // `sapzaddr` record.
@@ -190,7 +210,8 @@ fn attach_sapling_addresses(wallet: &ZcashdWallet, accounts: &mut WalletAccounts
         // part of the address encoding itself, not the ZIP 32 diversifier
         // index; legacy zcashd records no index, so none is set here.
         let sapling_addr = zewif::sapling::Address::new(addr_str.clone());
-        collected.push((addr_str, sapling_addr, KeyScope::External));
+        let target = sapling_routes.get(ivk).copied().unwrap_or(legacy_index);
+        collected.push((addr_str, sapling_addr, KeyScope::External, target));
         emitted.insert(*ivk);
     }
 
@@ -211,14 +232,15 @@ fn attach_sapling_addresses(wallet: &ZcashdWallet, accounts: &mut WalletAccounts
             addr_str.clone(),
             zewif::sapling::Address::new(addr_str),
             KeyScope::Foreign,
+            legacy_index,
         ));
     }
 
-    collected.sort_by(|(a, _, _), (b, _, _)| a.cmp(b));
-    for (_, sapling_addr, scope) in collected {
+    collected.sort_by(|(a, _, _, _), (b, _, _, _)| a.cmp(b));
+    for (_, sapling_addr, scope, target) in collected {
         let mut address = Address::new(ProtocolAddress::Sapling(Box::new(sapling_addr)));
         address.set_scope(scope);
-        accounts.accounts[legacy_index].add_address(address);
+        accounts.accounts[target].add_address(address);
     }
 
     Ok(())

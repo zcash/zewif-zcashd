@@ -1,1 +1,5 @@
 /target
+
+# Exported wallet documents (the read_wallet example writes wallet.zewif
+# into the working directory by default; these carry secret material)
+*.zewif
