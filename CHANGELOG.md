@@ -27,6 +27,10 @@ and this library adheres to Rust's notion of
   like any other seed-derived account, including into viewing-only wallets.
   A wallet with no seed material at all still exports it as a bare
   transparent address set.
+- Transparent addresses now carry their public keys whenever the wallet
+  holds them, not only for watch-only imports. The public key is the
+  transparent key's viewing half; a viewing-only import (which strips the
+  secret store) needs it to register the address for watching.
 
 ## [0.1.0-rc.5] - 2026-08-17
 

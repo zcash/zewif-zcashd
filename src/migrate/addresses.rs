@@ -65,7 +65,10 @@ fn attach_transparent_addresses(
     // The key database: every keypair (including reserved keypool keys, whose
     // public keys live here) yields a P2PKH address. HD-derived keys carry
     // their derivation; independently generated / imported keys are marked
-    // `Imported` with the private key held in the secret store.
+    // `Imported` with the private key held in the secret store. The public
+    // key is recorded alongside either way: it is the transparent key's
+    // viewing half, and a viewing-only import (which strips the secret
+    // store) needs it to register the address for watching.
     for keypair in wallet.keys().keypairs() {
         let pk = PublicKey::from_slice(keypair.pubkey().as_slice())
             .map_err(MigrateError::InvalidPublicKey)?;
@@ -74,6 +77,14 @@ fn attach_transparent_addresses(
         let entry = entries.entry(addr_str).or_default();
         entry.spend_authority.get_or_insert(authority);
         entry.scope.get_or_insert(scope);
+        match zewif::transparent::TransparentPubKey::from_bytes(
+            keypair.pubkey().as_slice().to_vec(),
+        ) {
+            Ok(pubkey) => {
+                entry.pubkey.get_or_insert(pubkey);
+            }
+            Err(e) => eprintln!("warning: transparent public key dropped: {e}"),
+        }
     }
 
     // Watch-only imports (`importaddress` / `importpubkey`). P2PK entries carry
@@ -136,11 +147,10 @@ fn attach_transparent_addresses(
         if let Some(authority) = info.spend_authority {
             t_addr.set_spend_authority(authority);
         }
-        // A watch-only public key is only carried when there is no spend
-        // authority (otherwise it is derivable from the private key).
-        if t_addr.spend_authority().is_none()
-            && let Some(pubkey) = info.pubkey
-        {
+        // The public key is carried whenever it is known — including for
+        // spendable keys, whose private halves travel only in the secret
+        // store and are absent from a viewing-only export.
+        if let Some(pubkey) = info.pubkey {
             t_addr.set_pubkey(pubkey);
         }
         if let Some(redeem_script) = info.redeem_script {
