@@ -7,6 +7,18 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+### Fixed
+- Watch-only P2PK entries (zcashd `importpubkey`) and transparent keypairs are
+  now surfaced at the P2PKH address of the public key's serialization as
+  stored, matching the key id zcashd computes for it. An uncompressed key was
+  previously keyed under its compressed form's address — one the source wallet
+  never watched — and a wallet holding both serializations of one key
+  collapsed to a single entry, discarding the other.
+
+### Added
+- `KeyId::from_pubkey`, the key id of a public key's serialization as stored
+  (RIPEMD-160 of SHA-256, zcashd's `CPubKey::GetID()`).
+
 ## [0.1.0-rc.5] - 2026-08-17
 
 ### Fixed

@@ -4,7 +4,6 @@ use secp256k1::PublicKey;
 use zcash_address::{ToAddress, ZcashAddress};
 use zcash_keys::keys::{ReceiverRequirement, UnifiedAddressRequest};
 use zcash_protocol::consensus;
-use zcash_transparent::address::TransparentAddress;
 use zip32::DiversifierIndex;
 
 use zewif::{
@@ -23,7 +22,7 @@ use crate::{
     zcashd_wallet::{
         ReceiverType,
         sprout::SproutPaymentAddress,
-        transparent::{KeyPair, WatchScriptKind},
+        transparent::{KeyId, KeyPair, WatchScriptKind},
     },
 };
 
@@ -65,9 +64,12 @@ fn attach_transparent_addresses(
     // their derivation; independently generated / imported keys are marked
     // `Imported` with the private key held in the secret store.
     for keypair in wallet.keys().keypairs() {
-        let pk = PublicKey::from_slice(keypair.pubkey().as_slice())
+        // Validate that the stored bytes are a well-formed secp256k1 point;
+        // the address is derived from the serialization as stored, matching
+        // the key id zcashd computes for it.
+        PublicKey::from_slice(keypair.pubkey().as_slice())
             .map_err(MigrateError::InvalidPublicKey)?;
-        let addr_str = p2pkh_address_string(&pk, network);
+        let addr_str = KeyId::from_pubkey(keypair.pubkey()).to_string(network);
         let (authority, scope) = transparent_spend_info(keypair);
         let entry = entries.entry(addr_str).or_default();
         entry.spend_authority.get_or_insert(authority);
@@ -80,8 +82,17 @@ fn attach_transparent_addresses(
     for watch in wallet.watch_scripts() {
         match watch.kind() {
             WatchScriptKind::P2PK(pubkey) => match PublicKey::from_slice(pubkey.as_slice()) {
-                Ok(pk) => {
-                    let addr_str = p2pkh_address_string(&pk, network);
+                Ok(_) => {
+                    // The watched address is derived from the key's
+                    // serialization as stored: zcashd keys its watch set by
+                    // the Hash160 of the stored bytes, so deriving from the
+                    // reparsed key would normalize an uncompressed key to its
+                    // compressed form and name an address zcashd never
+                    // watched. Hashing the stored form also lands this entry
+                    // on the same address as the P2PKH watch script zcashd
+                    // imports alongside it, so the two records merge instead
+                    // of splitting across addresses.
+                    let addr_str = KeyId::from_pubkey(pubkey).to_string(network);
                     let entry = entries.entry(addr_str).or_default();
                     match zewif::transparent::TransparentPubKey::from_bytes(
                         pubkey.as_slice().to_vec(),
@@ -163,13 +174,6 @@ fn transparent_spend_info(keypair: &KeyPair) -> (TransparentSpendAuthority, KeyS
         return (TransparentSpendAuthority::Derived(info), scope);
     }
     (TransparentSpendAuthority::Imported, KeyScope::Foreign)
-}
-
-fn p2pkh_address_string(pk: &PublicKey, network: &Network) -> String {
-    let TransparentAddress::PublicKeyHash(hash) = TransparentAddress::from_pubkey(pk) else {
-        unreachable!("from_pubkey always returns PublicKeyHash");
-    };
-    ZcashAddress::from_transparent_p2pkh(address_network_from_zewif(network), hash).to_string()
 }
 
 fn attach_sapling_addresses(wallet: &ZcashdWallet, accounts: &mut WalletAccounts) -> Result<(), MigrateError> {
