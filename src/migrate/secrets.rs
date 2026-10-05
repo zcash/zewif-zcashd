@@ -8,30 +8,6 @@ use zewif::{
 use crate::migrate::MigrateError;
 use crate::{ZcashdWallet, migrate::addresses::sprout_address_string};
 
-/// The raw ZIP-32 fingerprint bytes of the wallet's mnemonic seed, if a
-/// mnemonic is present. Taken from the mnemonic HD chain, where zcashd records
-/// them directly; key metadata `seed_fp` records reference the same bytes.
-pub(crate) fn mnemonic_seed_fp_bytes(wallet: &ZcashdWallet) -> Option<[u8; 32]> {
-    let mnemonic = wallet.bip39_mnemonic()?;
-    if mnemonic.mnemonic().is_empty() {
-        return None;
-    }
-    wallet
-        .mnemonic_hd_chain()?
-        .seed_fp()
-        .as_slice()
-        .try_into()
-        .ok()
-}
-
-/// The ZIP-32 seed fingerprint of the wallet's mnemonic seed, if a mnemonic is
-/// present.
-pub(crate) fn mnemonic_seed_fingerprint(wallet: &ZcashdWallet) -> Option<SeedFingerprint> {
-    Some(crate::zcashd_wallet::encode_seed_fingerprint(
-        &mnemonic_seed_fp_bytes(wallet)?,
-    ))
-}
-
 /// The BIP-39 mnemonic and ZIP-32 seed fingerprint that zcashd derives from a
 /// pre-mnemonic (pre-v4.7.0) legacy HD seed when upgrading a wallet to mnemonic
 /// support.
@@ -69,6 +45,38 @@ pub(crate) fn legacy_mnemonic_seed(
         .transpose()
 }
 
+/// The 64-byte BIP-39 seed and ZIP-32 fingerprint from which zcashd derives
+/// its post-v4.7.0 accounts, where recoverable: the wallet's own recorded
+/// mnemonic, or — for a pre-mnemonic wallet with a legacy HD seed — the
+/// mnemonic zcashd's own upgrade would derive from that seed. `None` when the
+/// wallet carries no seed material at all.
+pub(crate) fn legacy_account_seed(
+    wallet: &ZcashdWallet,
+) -> Result<Option<(secrecy::SecretVec<u8>, SeedFingerprint)>, MigrateError> {
+    use secrecy::Zeroize;
+
+    if let Some(recorded) = wallet.mnemonic_seed()? {
+        let (_, seed, fingerprint) = recorded.into_parts();
+        return Ok(Some((seed, fingerprint)));
+    }
+
+    let Some(legacy_seed) = wallet.legacy_hd_seed() else {
+        return Ok(None);
+    };
+    let legacy_seed = secrecy::SecretVec::new(legacy_seed.as_slice().to_vec());
+    let mnemonic = zcash_keys::keys::zcashd::derive_mnemonic(&legacy_seed)
+        .ok_or(MigrateError::InvalidLegacySeedLength)?;
+    let mut seed_bytes = mnemonic.to_seed("");
+    let fp = zip32::fingerprint::SeedFingerprint::from_seed(&seed_bytes)
+        .ok_or(MigrateError::InvalidLegacySeedLength)?;
+    let seed = secrecy::SecretVec::new(seed_bytes.to_vec());
+    seed_bytes.zeroize();
+    Ok(Some((
+        seed,
+        crate::zcashd_wallet::encode_seed_fingerprint(&fp.to_bytes()),
+    )))
+}
+
 /// The ZIP-32 seed fingerprint of the wallet's pre-mnemonic legacy HD seed, if
 /// present. Recomputed from the seed bytes per ZIP-32 (the seed types no longer
 /// carry the fingerprint).
@@ -97,14 +105,14 @@ pub(crate) fn build_secret_store(wallet: &ZcashdWallet) -> Result<Option<SecretS
     // for a pre-mnemonic wallet with a legacy HD seed it is re-derived from
     // that seed exactly as zcashd's upgrade would, so the legacy account can
     // be imported as a seed-derived account.
-    match (mnemonic_seed_fingerprint(wallet), wallet.bip39_mnemonic()) {
-        (Some(fp), Some(mnemonic)) => {
+    match wallet.mnemonic_seed()? {
+        Some(recorded) => {
             store.add_seed(SeedEntry::new(
-                fp,
-                SeedMaterial::Bip39Mnemonic(mnemonic.clone()),
+                recorded.fingerprint().clone(),
+                SeedMaterial::Bip39Mnemonic(recorded.mnemonic().clone()),
             ));
         }
-        _ => {
+        None => {
             if let Some((mnemonic, fp)) = legacy_mnemonic_seed(wallet)? {
                 store.add_seed(SeedEntry::new(fp, SeedMaterial::Bip39Mnemonic(mnemonic)));
             }

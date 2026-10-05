@@ -9,6 +9,7 @@ mod_use!(key_metadata);
 mod_use!(incremental_merkle_tree);
 mod_use!(incremental_witness);
 mod_use!(mnemonic_hd_chain);
+mod_use!(mnemonic_seed);
 mod_use!(network_info);
 mod_use!(parseable_types);
 mod_use!(receiver_type);
@@ -195,6 +196,22 @@ impl ZcashdWallet {
     /// upgraded by zcashd v4.7.0 or later.
     pub fn bip39_mnemonic(&self) -> Option<&Bip39Mnemonic> {
         self.bip39_mnemonic.as_ref()
+    }
+
+    /// The wallet's BIP-39 mnemonic, together with the seed and seed
+    /// fingerprint derived from its phrase.
+    ///
+    /// Returns `Ok(None)` when the wallet records no mnemonic. zcashd records
+    /// a mnemonic only in wallets that zcashd v4.7.0 or later created or
+    /// upgraded. Returns an error when the phrase does not parse in its recorded
+    /// language (see [`MnemonicSeed::from_mnemonic`]), or when the wallet's
+    /// mnemonic HD chain record stores a seed fingerprint that differs from
+    /// the derived one ([`MnemonicSeedError::FingerprintMismatch`]).
+    pub fn mnemonic_seed(&self) -> Result<Option<MnemonicSeed>, MnemonicSeedError> {
+        mnemonic_seed::recorded_mnemonic_seed(
+            self.bip39_mnemonic(),
+            self.mnemonic_hd_chain().map(MnemonicHDChain::seed_fp),
+        )
     }
 
     pub fn network_info(&self) -> &NetworkInfo {

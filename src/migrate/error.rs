@@ -55,6 +55,20 @@ pub enum MigrateError {
     #[error("legacy HD seed has an invalid length for ZIP 32 fingerprinting")]
     InvalidLegacySeedLength,
 
+    /// The wallet's recorded mnemonic did not yield a seed.
+    #[error("reading the wallet's mnemonic seed: {0}")]
+    MnemonicSeed(#[from] crate::zcashd_wallet::MnemonicSeedError),
+
+    /// Deriving the legacy account's unified spending key from the mnemonic
+    /// seed failed.
+    #[error("deriving the legacy account from the mnemonic seed: {0}")]
+    LegacyAccountDerivation(#[source] zcash_keys::keys::DerivationError),
+
+    /// The legacy account's unified full viewing key, derived from the
+    /// mnemonic seed, has no ZIP 316 encoding.
+    #[error("cannot encode the legacy account's UFVK: {0}")]
+    LegacyAccountUfvkEncoding(#[source] zcash_keys::encoding::UnifiedEncodingError),
+
     /// Converting a single wallet transaction failed.
     #[error("converting transaction {txid}: {source}")]
     TransactionConversion {
