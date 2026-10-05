@@ -44,6 +44,8 @@ zcash_protocol = { version = "=0.11.0-pre.0", features = ["local-consensus"] }
 zcash_transparent = { version = "=0.11.0-pre.0", features = ["transparent-inputs"] }
 secp256k1 = "0.33"
 secrecy = "0.8"
+# Every wordlist: zcashd records the language of its mnemonic phrase.
+bip0039 = { version = "0.14", features = ["all-languages"] }
 zip32 = "0.3"
 orchard = "0.16"
 sapling = { package = "sapling-crypto", version = "0.9", features = ["temporary-zcashd"] }

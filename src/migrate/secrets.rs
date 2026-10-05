@@ -8,28 +8,79 @@ use zewif::{
 use crate::migrate::MigrateError;
 use crate::{ZcashdWallet, migrate::addresses::sprout_address_string};
 
-/// The raw ZIP-32 fingerprint bytes of the wallet's mnemonic seed, if a
-/// mnemonic is present. Taken from the mnemonic HD chain, where zcashd records
-/// them directly; key metadata `seed_fp` records reference the same bytes.
-pub(crate) fn mnemonic_seed_fp_bytes(wallet: &ZcashdWallet) -> Option<[u8; 32]> {
-    let mnemonic = wallet.bip39_mnemonic()?;
-    if mnemonic.mnemonic().is_empty() {
-        return None;
-    }
-    wallet
-        .mnemonic_hd_chain()?
-        .seed_fp()
-        .as_slice()
-        .try_into()
-        .ok()
+/// The wallet's recorded BIP-39 mnemonic, with the 64-byte BIP-39 seed and
+/// the ZIP-32 seed fingerprint derived from its phrase.
+pub(crate) struct WalletMnemonicSeed {
+    pub mnemonic: Bip39Mnemonic,
+    pub seed: secrecy::SecretVec<u8>,
+    pub fingerprint: SeedFingerprint,
 }
 
-/// The ZIP-32 seed fingerprint of the wallet's mnemonic seed, if a mnemonic is
-/// present.
-pub(crate) fn mnemonic_seed_fingerprint(wallet: &ZcashdWallet) -> Option<SeedFingerprint> {
-    Some(crate::zcashd_wallet::encode_seed_fingerprint(
-        &mnemonic_seed_fp_bytes(wallet)?,
-    ))
+/// The wallet's recorded mnemonic and the seed and fingerprint derived from
+/// it, or `None` when the wallet records no mnemonic.
+///
+/// The phrase is validated against the wordlist of its recorded language
+/// (English when no language is recorded). The fingerprint is computed from
+/// the phrase's seed. When the wallet also has a mnemonic HD chain record, the
+/// fingerprint that record stores must match; a mismatch is an error.
+pub(crate) fn wallet_mnemonic_seed(
+    wallet: &ZcashdWallet,
+) -> Result<Option<WalletMnemonicSeed>, MigrateError> {
+    use secrecy::Zeroize;
+
+    let Some(mnemonic) = wallet.bip39_mnemonic() else {
+        return Ok(None);
+    };
+    if mnemonic.mnemonic().is_empty() {
+        return Ok(None);
+    }
+    let language = mnemonic
+        .language()
+        .map_or(Ok(bip0039::BuiltInLanguage::English), bip39_language)?;
+    let parsed = bip0039::AnyMnemonic::from_phrase(language, mnemonic.mnemonic())
+        .map_err(|_| MigrateError::InvalidMnemonic)?;
+    let mut seed_bytes = parsed.to_seed("");
+    let fp_bytes = zip32::fingerprint::SeedFingerprint::from_seed(&seed_bytes)
+        .expect("a BIP-39 seed is 64 bytes")
+        .to_bytes();
+    let seed = secrecy::SecretVec::new(seed_bytes.to_vec());
+    seed_bytes.zeroize();
+    let fingerprint = crate::zcashd_wallet::encode_seed_fingerprint(&fp_bytes);
+
+    if let Some(chain) = wallet.mnemonic_hd_chain()
+        && *chain.seed_fp() != fp_bytes
+    {
+        return Err(MigrateError::MnemonicFingerprintMismatch {
+            recorded: *chain.seed_fp(),
+            derived: fingerprint,
+        });
+    }
+
+    Ok(Some(WalletMnemonicSeed {
+        mnemonic: mnemonic.clone(),
+        seed,
+        fingerprint,
+    }))
+}
+
+/// The BIP-39 wordlist for a mnemonic language.
+fn bip39_language(language: &MnemonicLanguage) -> Result<bip0039::BuiltInLanguage, MigrateError> {
+    use bip0039::BuiltInLanguage as L;
+    Ok(match language {
+        MnemonicLanguage::English => L::English,
+        MnemonicLanguage::SimplifiedChinese => L::ChineseSimplified,
+        MnemonicLanguage::TraditionalChinese => L::ChineseTraditional,
+        MnemonicLanguage::Czech => L::Czech,
+        MnemonicLanguage::French => L::French,
+        MnemonicLanguage::Italian => L::Italian,
+        MnemonicLanguage::Japanese => L::Japanese,
+        MnemonicLanguage::Korean => L::Korean,
+        MnemonicLanguage::Portuguese => L::Portuguese,
+        MnemonicLanguage::Spanish => L::Spanish,
+        MnemonicLanguage::Other(tag) => {
+            return Err(MigrateError::UnsupportedMnemonicLanguage(tag.clone()));
+        }
+    })
 }
 
 /// The BIP-39 mnemonic and ZIP-32 seed fingerprint that zcashd derives from a
@@ -69,6 +120,37 @@ pub(crate) fn legacy_mnemonic_seed(
         .transpose()
 }
 
+/// The 64-byte BIP-39 seed and ZIP-32 fingerprint from which zcashd derives
+/// its post-v4.7.0 accounts, where recoverable: the wallet's own recorded
+/// mnemonic, or — for a pre-mnemonic wallet with a legacy HD seed — the
+/// mnemonic zcashd's own upgrade would derive from that seed. `None` when the
+/// wallet carries no seed material at all.
+pub(crate) fn legacy_account_seed(
+    wallet: &ZcashdWallet,
+) -> Result<Option<(secrecy::SecretVec<u8>, SeedFingerprint)>, MigrateError> {
+    use secrecy::Zeroize;
+
+    if let Some(recorded) = wallet_mnemonic_seed(wallet)? {
+        return Ok(Some((recorded.seed, recorded.fingerprint)));
+    }
+
+    let Some(legacy_seed) = wallet.legacy_hd_seed() else {
+        return Ok(None);
+    };
+    let legacy_seed = secrecy::SecretVec::new(legacy_seed.as_slice().to_vec());
+    let mnemonic = zcash_keys::keys::zcashd::derive_mnemonic(&legacy_seed)
+        .ok_or(MigrateError::InvalidLegacySeedLength)?;
+    let mut seed_bytes = mnemonic.to_seed("");
+    let fp = zip32::fingerprint::SeedFingerprint::from_seed(&seed_bytes)
+        .ok_or(MigrateError::InvalidLegacySeedLength)?;
+    let seed = secrecy::SecretVec::new(seed_bytes.to_vec());
+    seed_bytes.zeroize();
+    Ok(Some((
+        seed,
+        crate::zcashd_wallet::encode_seed_fingerprint(&fp.to_bytes()),
+    )))
+}
+
 /// The ZIP-32 seed fingerprint of the wallet's pre-mnemonic legacy HD seed, if
 /// present. Recomputed from the seed bytes per ZIP-32 (the seed types no longer
 /// carry the fingerprint).
@@ -97,14 +179,14 @@ pub(crate) fn build_secret_store(wallet: &ZcashdWallet) -> Result<Option<SecretS
     // for a pre-mnemonic wallet with a legacy HD seed it is re-derived from
     // that seed exactly as zcashd's upgrade would, so the legacy account can
     // be imported as a seed-derived account.
-    match (mnemonic_seed_fingerprint(wallet), wallet.bip39_mnemonic()) {
-        (Some(fp), Some(mnemonic)) => {
+    match wallet_mnemonic_seed(wallet)? {
+        Some(recorded) => {
             store.add_seed(SeedEntry::new(
-                fp,
-                SeedMaterial::Bip39Mnemonic(mnemonic.clone()),
+                recorded.fingerprint,
+                SeedMaterial::Bip39Mnemonic(recorded.mnemonic),
             ));
         }
-        _ => {
+        None => {
             if let Some((mnemonic, fp)) = legacy_mnemonic_seed(wallet)? {
                 store.add_seed(SeedEntry::new(fp, SeedMaterial::Bip39Mnemonic(mnemonic)));
             }
@@ -259,6 +341,25 @@ fn transparent_key_entry(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mnemonic_is_validated_against_its_recorded_language() {
+        let spanish = bip0039::Mnemonic::<bip0039::Spanish>::from_entropy(vec![0u8; 32])
+            .expect("32 bytes of entropy");
+        let phrase = spanish.phrase();
+
+        let language = bip39_language(&MnemonicLanguage::Spanish).unwrap();
+        let parsed = bip0039::AnyMnemonic::from_phrase(language, phrase).expect("Spanish phrase");
+        assert_eq!(parsed.to_seed(""), spanish.to_seed(""));
+
+        let english = bip39_language(&MnemonicLanguage::English).unwrap();
+        assert!(bip0039::AnyMnemonic::from_phrase(english, phrase).is_err());
+
+        assert!(matches!(
+            bip39_language(&MnemonicLanguage::Other("tlh".into())),
+            Err(MigrateError::UnsupportedMnemonicLanguage(tag)) if tag == "tlh"
+        ));
+    }
 
     #[test]
     fn legacy_mnemonic_matches_zcashd_derivation() {

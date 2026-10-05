@@ -18,6 +18,8 @@ and this library adheres to Rust's notion of
 ### Added
 - `KeyId::from_pubkey`, the key id of a public key's serialization as stored
   (RIPEMD-160 of SHA-256, zcashd's `CPubKey::GetID()`).
+- `MigrateError` variants `InvalidMnemonic`, `UnsupportedMnemonicLanguage`,
+  `MnemonicFingerprintMismatch` and `LegacyAccountDerivation`.
 
 ### Changed
 - Migrated to the librustzcash NU7 pre-release cohort: `zcash_address`
@@ -42,6 +44,21 @@ and this library adheres to Rust's notion of
   scope. Sapling addresses of view-only keys remain on the synthesized legacy
   account, now with scope `Foreign`. Previously all Sapling addresses and
   notes were attached to the synthesized legacy account.
+- The synthesized legacy account now carries the unified full viewing key
+  derived from the post-v4.7.0 mnemonic seed at ZIP 32 account `0x7FFFFFFF`
+  (the identifier zcashd reserves for legacy transparent addresses derived
+  from system randomness), where the mnemonic — or, for a pre-mnemonic
+  wallet, the mnemonic zcashd's upgrade would derive from its legacy HD
+  seed — is recoverable. The account therefore imports from that location
+  like any other seed-derived account, including into viewing-only wallets.
+  A wallet with no seed material at all still exports it as a bare
+  transparent address set.
+- The exported mnemonic seed's fingerprint is now derived from the wallet's
+  recorded mnemonic phrase, which is validated against the wordlist of its
+  recorded language. `migrate_to_zewif` fails when the phrase does not parse,
+  when its language has no BIP-39 wordlist, or when the wallet's mnemonic HD
+  chain record stores a different fingerprint. Previously the fingerprint was
+  read from the mnemonic HD chain record without a check.
 
 ## [0.1.0-rc.5] - 2026-08-17
 

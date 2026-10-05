@@ -46,6 +46,33 @@ pub enum MigrateError {
     #[error("legacy HD seed has an invalid length for ZIP 32 fingerprinting")]
     InvalidLegacySeedLength,
 
+    /// The wallet's recorded BIP-39 mnemonic phrase failed to parse.
+    #[error("the wallet's recorded BIP-39 mnemonic phrase is invalid")]
+    InvalidMnemonic,
+
+    /// The wallet's mnemonic phrase is recorded in a language that has no
+    /// BIP-39 wordlist.
+    #[error("the wallet's mnemonic phrase language {0:?} has no BIP-39 wordlist")]
+    UnsupportedMnemonicLanguage(String),
+
+    /// The seed fingerprint in the wallet's mnemonic HD chain record does
+    /// not match the fingerprint of the seed derived from its recorded
+    /// mnemonic phrase.
+    #[error(
+        "mnemonic HD chain records seed fingerprint {} but the mnemonic phrase derives {}",
+        hex::encode(recorded),
+        derived.encoding()
+    )]
+    MnemonicFingerprintMismatch {
+        recorded: [u8; 32],
+        derived: zewif::SeedFingerprint,
+    },
+
+    /// Deriving the legacy account's unified spending key from the mnemonic
+    /// seed failed.
+    #[error("deriving the legacy account from the mnemonic seed: {0}")]
+    LegacyAccountDerivation(#[source] zcash_keys::keys::DerivationError),
+
     /// Converting a single wallet transaction failed.
     #[error("converting transaction {txid}: {source}")]
     TransactionConversion {

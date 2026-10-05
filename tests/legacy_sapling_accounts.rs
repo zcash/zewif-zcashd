@@ -67,7 +67,7 @@ fn legacy_sapling_key_becomes_its_own_account() {
 
     let legacy = accounts
         .iter()
-        .find(|a| matches!(a.viewing_key(), AccountViewingKey::TransparentAddressSet))
+        .find(|a| a.name() == "Legacy")
         .expect("the synthesized legacy account is present");
     assert_eq!(
         sapling_addrs(legacy),
@@ -87,11 +87,50 @@ fn legacy_sapling_key_becomes_its_own_account() {
     assert_eq!(store.sapling_keys()[0].fvk().encoding(), efvk.encoding());
 
     // The recorded derivation points at the exported mnemonic seed.
-    let mnemonic_fp = store
+    let mnemonic_entry = store
         .seeds()
         .iter()
         .find(|entry| matches!(entry.material(), zewif::SeedMaterial::Bip39Mnemonic(_)))
-        .expect("the mnemonic seed is exported")
-        .fingerprint();
-    assert_eq!(derived.seed_fingerprint(), mnemonic_fp);
+        .expect("the mnemonic seed is exported");
+    assert_eq!(derived.seed_fingerprint(), mnemonic_entry.fingerprint());
+
+    // The legacy account is exported under ZIP 32 account 0x7FFFFFFF of the
+    // mnemonic seed, carrying the full viewing key derived from it: the same
+    // UFVK an importer holding the seed would re-derive.
+    let AccountViewingKey::Ufvk(legacy_ufvk) = legacy.viewing_key() else {
+        panic!(
+            "a mnemonic-bearing wallet's legacy account carries a UFVK: {:?}",
+            legacy.viewing_key()
+        );
+    };
+    let Some(zewif::KeySource::Derived(legacy_derived)) = legacy.key_source() else {
+        panic!(
+            "the legacy account is seed-derived: {:?}",
+            legacy.key_source()
+        );
+    };
+    assert_eq!(legacy_derived.account_index(), 0x7FFF_FFFF);
+    assert_eq!(legacy_derived.legacy_address_index(), None);
+    assert_eq!(
+        legacy_derived.seed_fingerprint(),
+        mnemonic_entry.fingerprint()
+    );
+
+    let zewif::SeedMaterial::Bip39Mnemonic(phrase) = mnemonic_entry.material() else {
+        unreachable!("filtered above");
+    };
+    let mnemonic =
+        <bip0039::Mnemonic<bip0039::English>>::from_phrase(phrase.mnemonic()).expect("parses");
+    // A regtest document exported without an activation schedule encodes
+    // unified material as for the test network (same coin type).
+    let params = zcash_protocol::consensus::TEST_NETWORK;
+    let expected = zcash_keys::keys::UnifiedSpendingKey::from_seed(
+        &params,
+        &mnemonic.to_seed(""),
+        zip32::AccountId::try_from(0x7FFF_FFFF).expect("valid account id"),
+    )
+    .expect("derives")
+    .to_unified_full_viewing_key()
+    .encode(&params);
+    assert_eq!(legacy_ufvk.encoding(), &expected);
 }
