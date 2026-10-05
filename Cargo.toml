@@ -43,7 +43,7 @@ zip32 = "0.3"
 orchard = "0.16"
 sapling = { package = "sapling-crypto", version = "0.9", features = ["temporary-zcashd"] }
 incrementalmerkletree = "0.9"
-bridgetree = "0.7"
+bridgetree = "0.8"
 bs58 = { version = "0.5.1", features = ["check"] }
 bech32 = "0.12"
 
@@ -54,8 +54,3 @@ hex = "0.4.3"
 unexpected_cfgs = { level = "warn", check-cfg = [
   'cfg(zcash_unstable, values("nu7"))',
 ] }
-
-[patch.crates-io]
-# TEMPORARY: bridgetree on incrementalmerkletree 0.9 (zcash/incrementalmerkletree#215, merged).
-# Replace with the released version once it is published.
-bridgetree = { git = "https://github.com/zcash/incrementalmerkletree.git", rev = "83218cae0041bccc1968a3cf98dd6b72b774be08" }

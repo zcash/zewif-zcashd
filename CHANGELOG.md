@@ -24,7 +24,7 @@ and this library adheres to Rust's notion of
   0.14.0-pre.0, `zcash_keys` 0.17.0-pre.0, `zcash_primitives` 0.31.0-pre.0,
   `zcash_protocol` 0.11.0-pre.0 and `zcash_transparent` 0.11.0-pre.0, together
   with `orchard` 0.16, `sapling-crypto` 0.9, `incrementalmerkletree` 0.9,
-  `zcash_encoding` 0.5, `zip32` 0.3 and `secp256k1` 0.33.
+  `zcash_encoding` 0.5, `zip32` 0.3, `secp256k1` 0.33 and `bridgetree` 0.8.
 - `regtest_params_from_local` now always includes the NU7 activation height. It
   was previously included only when built with `--cfg zcash_unstable="nu7"`,
   which `zcash_protocol` 0.11 no longer requires.
