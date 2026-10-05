@@ -45,7 +45,7 @@
 //!
 //! ## Module Structure
 //!
-//! - [`parse_macro`]: Defines the `parse!` macro for context-aware parsing
+//! - `parse_macro`: Defines the `parse!` macro for context-aware parsing
 //! - `parser_impl`: Core parser implementation and the `Parse` trait definition
 //! - `parseable_types`: Standard implementations of the `Parse` trait for common types
 //! - [`prelude`]: Common imports for convenient parser usage
