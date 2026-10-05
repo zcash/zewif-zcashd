@@ -231,7 +231,7 @@ dependencies = [
 [[package]]
 name = "bridgetree"
 version = "0.7.1"
-source = "git+https://github.com/pacu/incrementalmerkletree.git?rev=1d664ee#1d664ee6135bef6b6abd15f9f4ac4647d0315865"
+source = "git+https://github.com/zcash/incrementalmerkletree.git?rev=83218cae0041bccc1968a3cf98dd6b72b774be08#83218cae0041bccc1968a3cf98dd6b72b774be08"
 dependencies = [
  "incrementalmerkletree",
 ]

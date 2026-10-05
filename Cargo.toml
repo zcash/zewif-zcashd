@@ -56,6 +56,6 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 ] }
 
 [patch.crates-io]
-# TEMPORARY: bridgetree on incrementalmerkletree 0.9 (zcash/incrementalmerkletree#215).
+# TEMPORARY: bridgetree on incrementalmerkletree 0.9 (zcash/incrementalmerkletree#215, merged).
 # Replace with the released version once it is published.
-bridgetree = { git = "https://github.com/pacu/incrementalmerkletree.git", rev = "1d664ee" }
+bridgetree = { git = "https://github.com/zcash/incrementalmerkletree.git", rev = "83218cae0041bccc1968a3cf98dd6b72b774be08" }
