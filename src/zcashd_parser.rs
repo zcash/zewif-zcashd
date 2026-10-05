@@ -1252,11 +1252,10 @@ fn sapling_fvk_fingerprint(extfvk: &::sapling::zip32::ExtendedFullViewingKey) ->
 /// Whether a 32-byte secp256k1 scalar derives the given public key, used to
 /// confirm a decrypted transparent key (and thus the wallet passphrase).
 fn derived_pubkey_matches(scalar: &[u8; 32], pubkey: &PubKey) -> bool {
-    let secp = secp256k1::Secp256k1::signing_only();
-    let Ok(secret_key) = secp256k1::SecretKey::from_slice(scalar) else {
+    let Ok(secret_key) = secp256k1::SecretKey::from_secret_bytes(*scalar) else {
         return false;
     };
-    let derived = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
+    let derived = secp256k1::PublicKey::from_secret_key(&secret_key);
     let derived_bytes = if pubkey.is_compressed() {
         derived.serialize().to_vec()
     } else {
@@ -1284,7 +1283,8 @@ mod tests {
     /// from the originating spending key.
     #[test]
     fn extfvk_round_trip_yields_expected_ivk() {
-        let xsk = ExtendedSpendingKey::master(b"sapextfvk-test-seed");
+        let xsk = ExtendedSpendingKey::master(b"sapextfvk-test-seed")
+            .expect("the test seed derives a valid master key");
         #[allow(deprecated)]
         let original_efvk = xsk.to_extended_full_viewing_key();
 

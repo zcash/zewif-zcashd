@@ -19,6 +19,16 @@ and this library adheres to Rust's notion of
 - `KeyId::from_pubkey`, the key id of a public key's serialization as stored
   (RIPEMD-160 of SHA-256, zcashd's `CPubKey::GetID()`).
 
+### Changed
+- Migrated to the librustzcash NU7 pre-release cohort: `zcash_address`
+  0.14.0-pre.0, `zcash_keys` 0.17.0-pre.0, `zcash_primitives` 0.31.0-pre.0,
+  `zcash_protocol` 0.11.0-pre.0 and `zcash_transparent` 0.11.0-pre.0, together
+  with `orchard` 0.16, `sapling-crypto` 0.9, `incrementalmerkletree` 0.9,
+  `zcash_encoding` 0.5, `zip32` 0.3 and `secp256k1` 0.33.
+- `regtest_params_from_local` now always includes the NU7 activation height. It
+  was previously included only when built with `--cfg zcash_unstable="nu7"`,
+  which `zcash_protocol` 0.11 no longer requires.
+
 ## [0.1.0-rc.5] - 2026-08-17
 
 ### Fixed
