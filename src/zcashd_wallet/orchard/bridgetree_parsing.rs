@@ -1,6 +1,6 @@
 //! Utilities for reading zcashd-wallet-encoded `BridgeTree` values.
 //!
-//! Copied from https://github.com/zcash/zcash/blob/v6.2.0/src/rust/src/incremental_merkle_tree.rs
+//! Copied from <https://github.com/zcash/zcash/blob/v6.2.0/src/rust/src/incremental_merkle_tree.rs>
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, Read};

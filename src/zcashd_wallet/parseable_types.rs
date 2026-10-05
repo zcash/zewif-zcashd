@@ -407,7 +407,7 @@ impl Parse for UnifiedFullViewingKey {
         use zcash_address::unified::Encoding;
 
         let ufvk_str: String = parse!(p, "ufvk string")?;
-        let (_, ufvk) = zcash_address::unified::Ufvk::decode(&ufvk_str)?;
+        let (_, _, ufvk) = zcash_address::unified::Ufvk::decode(&ufvk_str)?;
         Ok(Self::parse(&ufvk)?)
     }
 }

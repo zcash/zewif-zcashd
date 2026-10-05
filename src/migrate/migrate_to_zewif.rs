@@ -47,14 +47,11 @@ fn regtest_params_from_local(local: &LocalNetwork) -> RegtestParams {
         (local.nu6_1, BranchId::Nu6_1),
         (local.nu6_2, BranchId::Nu6_2),
         (local.nu6_3, BranchId::Nu6_3),
+        (local.nu7, BranchId::Nu7),
     ] {
         if let Some(height) = height {
             activations.insert(u32::from(branch_id), u32::from(height));
         }
-    }
-    #[cfg(zcash_unstable = "nu7")]
-    if let Some(height) = local.nu7 {
-        activations.insert(u32::from(BranchId::Nu7), u32::from(height));
     }
     RegtestParams::new(activations)
 }
@@ -213,6 +210,7 @@ fn set_account_birthdays(wallet: &ZcashdWallet, accounts: &mut WalletAccounts) {
 
 #[cfg(test)]
 mod tests {
+    use zcash_address::unified::{self, Encoding, Ufvk};
     use zcash_keys::keys::{UnifiedAddressRequest, UnifiedFullViewingKey, UnifiedSpendingKey};
     use zcash_protocol::consensus::BlockHeight as ConsensusBlockHeight;
 
@@ -232,7 +230,6 @@ mod tests {
             nu6_1: Some(ConsensusBlockHeight::from_u32(8)),
             nu6_2: Some(ConsensusBlockHeight::from_u32(9)),
             nu6_3: Some(ConsensusBlockHeight::from_u32(10)),
-            #[cfg(zcash_unstable = "nu7")]
             nu7: Some(ConsensusBlockHeight::from_u32(11)),
         }
     }
@@ -291,16 +288,21 @@ mod tests {
         // parameters rejects them.
         let ufvk = test_ufvk(&params);
         let ufvk_str = ufvk.encode(&params);
-        assert!(
-            ufvk_str.starts_with("uviewregtest1"),
+        let (ufvk_network, _, _) = Ufvk::decode(&ufvk_str).expect("the UFVK encoding decodes");
+        assert_eq!(
+            ufvk_network,
+            NetworkType::Regtest,
             "expected a regtest UFVK encoding, got {ufvk_str}"
         );
         let (ua, _) = ufvk
             .default_address(UnifiedAddressRequest::AllAvailableKeys)
             .expect("the UFVK has a default address");
         let ua_str = ua.encode(&params);
-        assert!(
-            ua_str.starts_with("uregtest1"),
+        let (ua_network, _, _) =
+            unified::Address::decode(&ua_str).expect("the unified address encoding decodes");
+        assert_eq!(
+            ua_network,
+            NetworkType::Regtest,
             "expected a regtest unified address encoding, got {ua_str}"
         );
     }

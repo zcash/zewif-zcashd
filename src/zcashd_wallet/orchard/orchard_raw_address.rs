@@ -32,8 +32,11 @@ impl OrchardRawAddress {
         let orchard_receiver = zcash_address::unified::Receiver::Orchard(bytes);
 
         // Create a Unified Address with just this receiver
-        let unified_addr = zcash_address::unified::Address::try_from_items(vec![orchard_receiver])
-            .expect("A single valid receiver should create a valid unified address");
+        let unified_addr = zcash_address::unified::Address::try_from_items(
+            zcash_address::unified::Revision::R0,
+            vec![zcash_address::unified::Uitem::Data(orchard_receiver)],
+        )
+        .expect("A single valid receiver should create a valid unified address");
 
         // Create a ZcashAddress from the unified address
         let addr = ZcashAddress::from_unified(address_network_from_zewif(network), unified_addr);

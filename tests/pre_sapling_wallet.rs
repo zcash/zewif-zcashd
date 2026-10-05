@@ -108,7 +108,6 @@ fn migrates_to_a_single_imported_legacy_account() {
         nu6_1: None,
         nu6_2: None,
         nu6_3: None,
-        #[cfg(zcash_unstable = "nu7")]
         nu7: None,
     });
 
