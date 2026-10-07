@@ -69,7 +69,12 @@ pub(crate) fn build_accounts(
                 fingerprint: ufvk_fp.to_hex(),
             })?;
 
-        let encoding = ufvk.encode(params);
+        let encoding = ufvk
+            .encode(params)
+            .map_err(|source| MigrateError::UfvkEncoding {
+                fingerprint: ufvk_fp.to_hex(),
+                source,
+            })?;
         let mut account =
             Account::new(AccountViewingKey::Ufvk(zewif::UnifiedFullViewingKey::new(
                 encoding,

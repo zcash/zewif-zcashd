@@ -12,6 +12,15 @@ pub enum MigrateError {
     #[error("no UFVK found for unified account fingerprint {fingerprint}")]
     MissingAccountUfvk { fingerprint: String },
 
+    /// A unified account's UFVK has no ZIP 316 encoding at any revision
+    /// that `zcash_keys` emits. The fingerprint is rendered in zcashd's
+    /// display order for cross-referencing against zcashd output.
+    #[error("cannot encode the UFVK for unified account fingerprint {fingerprint}: {source}")]
+    UfvkEncoding {
+        fingerprint: String,
+        source: zcash_keys::encoding::UnifiedEncodingError,
+    },
+
     /// No UFVK was recorded for a unified address's key fingerprint. The
     /// fingerprint is rendered in zcashd's display order for
     /// cross-referencing against zcashd output.

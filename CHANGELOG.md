@@ -18,11 +18,13 @@ and this library adheres to Rust's notion of
 ### Added
 - `KeyId::from_pubkey`, the key id of a public key's serialization as stored
   (RIPEMD-160 of SHA-256, zcashd's `CPubKey::GetID()`).
+- `MigrateError::UfvkEncoding`, returned when a unified account's UFVK has no
+  ZIP 316 encoding. `zcash_keys` 0.17.0-pre.1 made UFVK encoding fallible.
 
 ### Changed
 - Migrated to the librustzcash NU7 pre-release cohort: `zcash_address`
-  0.14.0-pre.0, `zcash_keys` 0.17.0-pre.0, `zcash_primitives` 0.31.0-pre.0,
-  `zcash_protocol` 0.11.0-pre.0 and `zcash_transparent` 0.11.0-pre.0, together
+  0.14.0-pre.1, `zcash_keys` 0.17.0-pre.1, `zcash_primitives` 0.31.0-pre.1,
+  `zcash_protocol` 0.11.0-pre.0 and `zcash_transparent` 0.11.0-pre.1, together
   with `orchard` 0.16, `sapling-crypto` 0.9, `incrementalmerkletree` 0.9,
   `zcash_encoding` 0.5, `zip32` 0.3, `secp256k1` 0.33 and `bridgetree` 0.8.
 - `regtest_params_from_local` now always includes the NU7 activation height. It
