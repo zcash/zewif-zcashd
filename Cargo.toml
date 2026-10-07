@@ -31,12 +31,12 @@ blake2b_simd = "1"
 # 0.6.20` and should not be updated unless `zcashd` updates its dependency
 # versions. This crate exists expressly for deserialization of `zcashd`
 # `wallet.dat` encoded data, so these must be kept in sync.
-zcash_address = "=0.14.0-pre.0"
+zcash_address = "=0.14.0-pre.1"
 zcash_encoding = "0.5"
-zcash_keys = { version = "=0.17.0-pre.0", features = ["transparent-inputs", "sapling", "orchard", "zcashd-compat"] }
-zcash_primitives = "=0.31.0-pre.0"
+zcash_keys = { version = "=0.17.0-pre.1", features = ["transparent-inputs", "sapling", "orchard", "zcashd-compat"] }
+zcash_primitives = "=0.31.0-pre.1"
 zcash_protocol = { version = "=0.11.0-pre.0", features = ["local-consensus"] }
-zcash_transparent = { version = "=0.11.0-pre.0", features = ["transparent-inputs"] }
+zcash_transparent = { version = "=0.11.0-pre.1", features = ["transparent-inputs"] }
 secp256k1 = "0.33"
 secrecy = "0.8"
 zip32 = "0.3"

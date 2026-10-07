@@ -287,7 +287,9 @@ mod tests {
         // carry regtest HRPs, or an importer decoding against regtest
         // parameters rejects them.
         let ufvk = test_ufvk(&params);
-        let ufvk_str = ufvk.encode(&params);
+        let ufvk_str = ufvk
+            .encode(&params)
+            .expect("a test UFVK has shielded items, so it has an encoding");
         let (ufvk_network, _, _) = Ufvk::decode(&ufvk_str).expect("the UFVK encoding decodes");
         assert_eq!(
             ufvk_network,
