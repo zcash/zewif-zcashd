@@ -5,7 +5,7 @@ into the **Zcash Wallet Interchange Format (ZeWIF)**.
 
 ## Minimum Supported Rust Version (MSRV)
 
-This crate requires **Rust 1.88**. New language features that raise the MSRV
+This crate requires **Rust 1.89**. New language features that raise the MSRV
 must not be introduced without a corresponding bump here and in CI; the
 `msrv` job in `.github/workflows/ci.yml` enforces this.
 
