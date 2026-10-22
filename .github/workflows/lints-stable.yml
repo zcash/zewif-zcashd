@@ -3,6 +3,11 @@ name: Stable lints
 # We only run these lints on trial-merges of PRs to reduce noise.
 on: pull_request
 
+# `actions-rs/clippy-check` reports its findings as a check run.
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   clippy:
     name: Clippy (MSRV)
