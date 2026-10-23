@@ -17,6 +17,13 @@ updates:
       - dependency-name: sapling-crypto
       - dependency-name: incrementalmerkletree
       - dependency-name: bridgetree
+      # `secrecy` types cross the `zcash_keys` public API (`derive_mnemonic`
+      # takes a `SecretVec<u8>`), so its breaking releases must follow
+      # librustzcash rather than lead it. Patch updates are still accepted.
+      - dependency-name: secrecy
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
     open-pull-requests-limit: 10
 
   - package-ecosystem: github-actions
