@@ -200,7 +200,7 @@ pub(crate) fn build_secret_store(wallet: &ZcashdWallet) -> Result<Option<SecretS
 /// The ZIP 32 Bech32 Human-Readable Parts for Sapling extended keys on the
 /// given network: (extended spending key, extended full viewing key).
 fn sapling_hrps(network: &zewif::Network) -> (&'static str, &'static str) {
-    use zcash_protocol::constants::{mainnet, regtest, testnet};
+    use zcash_keys::constants::{mainnet, regtest, testnet};
     match network {
         zewif::Network::Mainnet => (
             mainnet::HRP_SAPLING_EXTENDED_SPENDING_KEY,
