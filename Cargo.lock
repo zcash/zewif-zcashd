@@ -25,17 +25,6 @@ dependencies = [
 
 [[package]]
 name = "aes"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b169f7a6d4742236a0a00c541b845991d0ac43e546831af1249753ab4c3aa3a0"
-dependencies = [
- "cfg-if",
- "cipher 0.4.4",
- "cpufeatures 0.2.17",
-]
-
-[[package]]
-name = "aes"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8eb277bec05f56a0e0591f155a484cbd0f4f07ff2905051a48c72f004f7ed58"
@@ -999,7 +988,7 @@ version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ae7ceb7b5387bd76cf3c0712f57708795c925cecf097036cedb60b5c3706e8f"
 dependencies = [
- "aes 0.9.2",
+ "aes",
  "bitvec",
  "blake2b_simd",
  "corez",
@@ -1319,7 +1308,7 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a2cbdcfeef20006adf72699cd466f21fe349674277cc05d3fc9b7302db7b182"
 dependencies = [
- "aes 0.9.2",
+ "aes",
  "bellman",
  "bitvec",
  "blake2b_simd",
@@ -1993,7 +1982,7 @@ dependencies = [
 name = "zewif-zcashd"
 version = "0.1.0-rc.6"
 dependencies = [
- "aes 0.8.4",
+ "aes",
  "bech32 0.12.0",
  "bitflags",
  "blake2b_simd",
