@@ -22,7 +22,7 @@ uuid = "1.1"
 # Wallet-encryption support: zcashd encrypts key material with AES-256-CBC
 # under a master key derived from the wallet passphrase via an iterated
 # SHA-512 KDF (see `src/zcashd_wallet/crypto.rs`).
-aes = "0.8"
+aes = "0.9"
 cbc = "0.1"
 zeroize = "1"
 blake2b_simd = "1"
