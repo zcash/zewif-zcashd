@@ -27,10 +27,8 @@ and this library adheres to Rust's notion of
   `zcash_transparent` 0.11, together with `orchard` 0.16, `sapling-crypto` 0.9,
   `incrementalmerkletree` 0.9, `zcash_encoding` 0.5, `zip32` 0.3, `secp256k1`
   0.33 and `bridgetree` 0.8.
-- MSRV is now 1.89, the MSRV of the librustzcash NU7 release cohort.
-- `regtest_params_from_local` now always includes the NU7 activation height. It
-  was previously included only when built with `--cfg zcash_unstable="nu7"`,
-  which `zcash_protocol` 0.11 no longer requires.
+- MSRV is now 1.89.
+- `regtest_params_from_local` now always includes the NU7 activation height.
 
 ## [0.1.0-rc.5] - 2026-08-17
 
