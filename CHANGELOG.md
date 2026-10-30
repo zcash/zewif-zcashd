@@ -7,6 +7,8 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+## [0.1.0-rc.6] - 2026-10-30
+
 ### Fixed
 - Watch-only P2PK entries (zcashd `importpubkey`) and transparent keypairs are
   now surfaced at the P2PKH address of the public key's serialization as
