@@ -1995,6 +1995,7 @@ version = "0.1.0-rc.6"
 dependencies = [
  "aes 0.8.4",
  "bech32 0.12.0",
+ "bip0039",
  "bitflags",
  "blake2b_simd",
  "bridgetree",

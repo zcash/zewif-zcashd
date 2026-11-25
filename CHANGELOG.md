@@ -7,6 +7,60 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+### Added
+- `ZcashdWallet::mnemonic_seed`, which returns the wallet's recorded mnemonic
+  together with the seed and ZIP 32 seed fingerprint derived from its phrase,
+  as a `zcashd_wallet::MnemonicSeed`. It returns
+  `zcashd_wallet::MnemonicSeedError` when the phrase does not parse in its
+  recorded language, or when the wallet's mnemonic HD chain record stores a
+  different fingerprint.
+- `MigrateError::MnemonicSeed`, which `migrate_to_zewif` returns when
+  `ZcashdWallet::mnemonic_seed` fails.
+- `MigrateError` variants `LegacyAccountDerivation` and
+  `LegacyAccountUfvkEncoding`.
+
+### Changed
+- `migrate_to_zewif` now exports each legacy Sapling spending key as its own
+  account, keyed by the key's extended full viewing key, with provenance
+  `zcashd_legacy` and (where the key's metadata records one) its seed
+  derivation. Keys that duplicate the Sapling component of a stored UFVK
+  (unified account receiver keys, which zcashd also stores in the Sapling
+  keystore) are identified by their diversifiable full viewing keys and
+  skipped. Previously legacy Sapling keys traveled only in the secret store,
+  so a viewing-only importer had no account under which to represent them.
+- `migrate_to_zewif` attaches each Sapling address and received note to the
+  account whose Sapling viewing key views it: a legacy Sapling key's account,
+  or the unified account whose Sapling receiver it is, with the matching key
+  scope. Sapling addresses of view-only keys remain on the synthesized legacy
+  account, now with scope `Foreign`. Previously all Sapling addresses and
+  notes were attached to the synthesized legacy account.
+- The synthesized legacy account now carries the unified full viewing key
+  derived from the post-v4.7.0 mnemonic seed at ZIP 32 account `0x7FFFFFFF`
+  (the identifier zcashd reserves for legacy transparent addresses derived
+  from system randomness), where the mnemonic — or, for a pre-mnemonic
+  wallet, the mnemonic zcashd's upgrade would derive from its legacy HD
+  seed — is recoverable. The account therefore imports from that location
+  like any other seed-derived account, including into viewing-only wallets.
+  A wallet with no seed material at all still exports it as a bare
+  transparent address set.
+- The exported mnemonic seed's fingerprint is now derived from the wallet's
+  recorded mnemonic phrase, which is validated against the wordlist of its
+  recorded language. `migrate_to_zewif` fails when the phrase does not parse,
+  when its language has no BIP-39 wordlist, or when the wallet's mnemonic HD
+  chain record stores a different fingerprint. Previously the fingerprint was
+  read from the mnemonic HD chain record without a check.
+- Transparent addresses now carry their public keys whenever the wallet
+  holds them, not only for watch-only imports. The public key is the
+  transparent key's viewing half; a viewing-only import (which strips the
+  secret store) needs it to register the address for watching.
+
+### Fixed
+- The legacy HD seed of an unencrypted wallet is now parsed. The `hdseed`
+  record is keyed by the seed's fingerprint, but it was looked up as a
+  keyname-only singleton, which never matches; every unencrypted wallet
+  therefore reported its legacy HD seed as absent, and exports omitted the
+  seed from the secret store. Encrypted wallets (`chdseed`) were unaffected.
+
 ## [0.1.0-rc.6] - 2026-10-30
 
 ### Fixed
